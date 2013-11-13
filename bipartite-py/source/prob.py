@@ -12,10 +12,11 @@ def flipCoin(p):
     '''
     return True if random.random() < p else False
 
-def sampleFrom15(y, j, gammas, uxjList, mj, parameters):
+def sampleFrom15(j, gammas, uxjList, mj, parameters):
     '''
         sample from distribution [Caron 2012, equation 15]
     '''
+    y = random.random()
     tao = parameters.tao
     sigma = parameters.sigma
     assert len(gammas) == len(uxjList)+1
