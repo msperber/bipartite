@@ -10,11 +10,11 @@ import source.generative_algo as gen
 import source.expressions as expr
 
 def dummyPoisson(x,y): return 10
-def dummyDistr15(): return 0.5
+def dummyDistr15(a,b,c,d): return 0.5
 
 def test_selectBooksForFirstReader():
     # using dummy functions: poisson distribution always returns 10, distr. (15) always 0.5
-    numBooks, bookScores = gen.selectBooksForFirstReader(0,
+    numBooks, bookScores = gen.selectBooksForFirstReader([0],
                                                      expr.Parameters(1.0, 1.0, 1.0),
                                                      poissonFunction=dummyPoisson,
                                                      sampleFrom15Function=dummyDistr15
