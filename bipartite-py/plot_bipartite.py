@@ -17,7 +17,7 @@ def usage():
 import getopt
 import sys
 from numpy import sum, array
-import pylab as plt
+import matplotlib.pyplot as plt
 
 import source.generative_algo as gen
 import source.expressions as expr

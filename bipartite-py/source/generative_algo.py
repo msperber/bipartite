@@ -49,13 +49,13 @@ def selectBooksForIthReader(gammas, numBooks, prevBookScoreList, simulationParam
             bookScores[j] = 0.0
     
     # consider unread books:
-    numAdditionalBooks = poisson(expr.psiTildeFunction(gammas[curReaderI], sum([gammas[k] for k in range(curReaderI)]), simulationParameters), (1)) # TODO: check
+    numAdditionalBooks = poisson(expr.psiTildeFunction(gammas[curReaderI], sum([gammas[k] for k in range(curReaderI)]), simulationParameters), (1)) # TODO: sv: should be fine now double check
     for j in range(numBooks, numBooks+numAdditionalBooks):
         bookScores[j] = 0.0
     
     # assign scores
     for bookNo in bookScores:
-        uList = [uScoreFromXScore(prevBookScoreList[k-1].get(j, 0.0)) for k in range(curReaderI)]
+        uList = [uScoreFromXScore(prevBookScoreList[k-1].get(j, 0.0)) for k in range(curReaderI)] # if book has not been read score is zero.
         bookScores[bookNo] = sampleFrom15(gammas[:curReaderI+1], uList, numTimesRead[bookNo], simulationParameters) # TODO: check
     
     return numBooks + numAdditionalBooks, bookScores
