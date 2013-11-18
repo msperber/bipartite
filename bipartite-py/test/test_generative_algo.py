@@ -15,7 +15,7 @@ def dummyDistr15(a,b,c,d): return 0.5
 def test_selectBooksForFirstReader():
     # using dummy functions: poisson distribution always returns 10, distr. (15) always 0.5
     numBooks, bookScores = gen.selectBooksForFirstReader([0],
-                                                     expr.Parameters(1.0, 1.0, 1.0),
+                                                     expr.Parameters(1.0, 0.9, 1.0),
                                                      poissonFunction=dummyPoisson,
                                                      sampleFrom15Function=dummyDistr15
                                                      ) 

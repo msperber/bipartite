@@ -8,11 +8,13 @@ import math
 
 class Parameters(object):
     def __init__(self, alpha, sigma, tao):
+        assert 0 <= sigma < 1.0
         self.alpha = alpha
         self.sigma = sigma
         self.tao = tao
 
 def lambdaFunction(w, parameters):
+    assert w!=0.0
     alpha = parameters.alpha
     sigma = parameters.sigma
     tao = parameters.tao
