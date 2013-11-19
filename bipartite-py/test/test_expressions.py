@@ -17,7 +17,7 @@ def test_psiFunction_boundaries_sigma():
     assert_almost_equal(5.0, expr.psiFunction(math.e - 1.0, expr.Parameters(5.0, 0.0, 1.0)))
 def test_psiFunction_boundaries_sigma2():
     assert_almost_equal(0.0, expr.psiFunction(0.0, expr.Parameters(5.0, 0.5, 3.0)))
-def test_psiFunction_boundaries_tao():
+def test_psiFunction_boundaries_tau():
     assert_almost_equal(1.0, expr.psiFunction(1.0**(-0.9), expr.Parameters(0.9, 0.9, 0.0)))
     
 def test_psiTildeFunction():

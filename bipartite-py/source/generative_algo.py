@@ -29,7 +29,7 @@ def uScoreFromXScore(xScore):
     return math.exp(-xScore)
 
 def selectBooksForIthReader(gammas, numBooks, prevBookScoreList, simulationParameters):
-    tao = simulationParameters.tao
+    tau = simulationParameters.tau
     curReaderI = len(prevBookScoreList) # (0-based reader index)
     
     numTimesRead = [] # m_j
@@ -43,8 +43,8 @@ def selectBooksForIthReader(gammas, numBooks, prevBookScoreList, simulationParam
     # consider previously read books:
     for j in range(numBooks):
         gammaUSum = sum([gammas[k]*uScoreFromXScore(prevBookScoreList[k-1].get(j, 0.0)) for k in range(curReaderI)])
-        prob = 1.0 - (expr.kappaFunction(numTimesRead[j], tao + gammas[curReaderI] + gammaUSum, simulationParameters) \
-                    / expr.kappaFunction(numTimesRead[j], tao + gammaUSum, simulationParameters))
+        prob = 1.0 - (expr.kappaFunction(numTimesRead[j], tau + gammas[curReaderI] + gammaUSum, simulationParameters) \
+                    / expr.kappaFunction(numTimesRead[j], tau + gammaUSum, simulationParameters))
         if prob.flipCoin(prob):
             bookScores[j] = 0.0
     

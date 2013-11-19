@@ -15,7 +15,7 @@ def usage():
     -h --help: print this Help message
     -g --gamma x: (Uniform) gamma parameter > 0
     -a --alpha x: Alpha parameter
-    -t --tao x: Tao parameter
+    -t --tau x: Tau parameter
     -s --sigma x: Sigma parameter
     -n --num-readers x: Fixed number or readers (int, >= 1)
 """
@@ -39,11 +39,11 @@ def main(argv=None):
     try:
         try:
             optlist, args = getopt.getopt(argv[1:], 'hg:a:t:s:n:', ['help', 'gamma=',
-                                                                    'alpha=', 'tao=',
+                                                                    'alpha=', 'tau=',
                                                                     'sigma=', 'num-readers='])
         except getopt.GetoptError, msg:
             raise Usage(msg)
-        gamma, alpha, tao, sigma, numReaders = None, None, None, None, None
+        gamma, alpha, tau, sigma, numReaders = None, None, None, None, None
         for o, a in optlist:
             if o in ["-h", "--help"]:
                 usage()
@@ -53,8 +53,8 @@ def main(argv=None):
                 assert a > 0
             if o in ["-a", "--alpha"]:
                 alpha = float(a)
-            if o in ["-t", "--tao"]:
-                tao = float(a)
+            if o in ["-t", "--tau"]:
+                tau = float(a)
             if o in ["-s", "--sigma"]:
                 sigma = float(a)
             if o in ["-n", "--num-readers"]:
@@ -66,7 +66,7 @@ def main(argv=None):
         ###########################
         ## MAIN PROGRAM ###########
         ###########################
-        simulationParameters = expr.Parameters(alpha, sigma, tao)
+        simulationParameters = expr.Parameters(alpha, sigma, tau)
         print gen.generateBipartiteGraph(simulationParameters, [gamma] ** numReaders)
         
         ###########################
