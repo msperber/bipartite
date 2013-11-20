@@ -4,31 +4,33 @@ Created on Nov 11, 2013
 @author: Matthias Sperber
 '''
 
-from numpy.random import poisson
+#from numpy.random import poisson
+import numpy
 import math
-from source.prob import sampleFrom15
+import source.prob as prob
 import source.expressions as expr    
 
-def selectBooksForFirstReader(gammas, simulationParams, **kw):
+def selectBooksForFirstReader(gammas, simulationParams,
+                              # override for module tests: 
+                              poisson=numpy.random.poisson, sampleFrom15=prob.sampleFrom15):
     '''
         selects a number of books, parametrized by lambda_1 ("interest in reading")
-        returns dictionary: book_no => book_score (bookScores[j] = x_{1j})
+        returns new number of read books,
+                dictionary: book_no => book_score (bookScores[j] = x_{1j})
     '''
-    # for easy unit testing, these can be replaced by dummies:
-    if 'poissonFunction' in kw: poisson = kw['poissonFunction']
-    if 'sampleFrom15Function' in kw: sampleFrom15 = kw['sampleFrom15Function']
     
-    numBooks = poisson(expr.psiFunction(gammas[0], simulationParams), (1)) # TODO: verify (not sure what psi SUBSCRIPT GAMMA means here..)
+    numBooks = poisson(expr.psiFunction(gammas[0], simulationParams), (1))
     bookScores = {}
     for j in range(numBooks):
-        bookScores[j] = sampleFrom15([gammas[0]], [], 0, simulationParams) # TODO: check
+        bookScores[j] = sampleFrom15([gammas[0]], [], 0, simulationParams)
 
     return numBooks, bookScores
 
 def uScoreFromXScore(xScore):
     return math.exp(-xScore)
 
-def selectBooksForIthReader(gammas, numBooks, prevBookScoreList, simulationParameters):
+def selectBooksForIthReader(gammas, numBooks, prevBookScoreList, simulationParameters,
+                            poisson=numpy.random.poisson, sampleFrom15=prob.sampleFrom15):
     tau = simulationParameters.tau
     curReaderI = len(prevBookScoreList) # (0-based reader index)
     
@@ -43,9 +45,9 @@ def selectBooksForIthReader(gammas, numBooks, prevBookScoreList, simulationParam
     # consider previously read books:
     for j in range(numBooks):
         gammaUSum = sum([gammas[k]*uScoreFromXScore(prevBookScoreList[k-1].get(j, 0.0)) for k in range(curReaderI)])
-        prob = 1.0 - (expr.kappaFunction(numTimesRead[j], tau + gammas[curReaderI] + gammaUSum, simulationParameters) \
+        probability = 1.0 - (expr.kappaFunction(numTimesRead[j], tau + gammas[curReaderI] + gammaUSum, simulationParameters) \
                     / expr.kappaFunction(numTimesRead[j], tau + gammaUSum, simulationParameters))
-        if prob.flipCoin(prob):
+        if prob.flipCoin(probability):
             bookScores[j] = 0.0
     
     # consider unread books:
@@ -56,7 +58,7 @@ def selectBooksForIthReader(gammas, numBooks, prevBookScoreList, simulationParam
     # assign scores
     for bookNo in bookScores:
         uList = [uScoreFromXScore(prevBookScoreList[k-1].get(j, 0.0)) for k in range(curReaderI)] # if book has not been read score is zero.
-        bookScores[bookNo] = sampleFrom15(gammas[:curReaderI+1], uList, numTimesRead[bookNo], simulationParameters) # TODO: check
+        bookScores[bookNo] = sampleFrom15(gammas[:curReaderI+1], uList, numTimesRead[bookNo] if bookNo < len(numTimesRead) else 0, simulationParameters)
     
     return numBooks + numAdditionalBooks, bookScores
 
@@ -65,8 +67,9 @@ def generateBipartiteGraph(simulationParameters, gammas):
     allScores = [firstScores]
     for _ in range(len(gammas)-1):
         numBooks, scores = selectBooksForIthReader(gammas, numBooks, allScores, simulationParameters)
+        allScores.append(scores)
     sparseMatrix = []
     for scores in allScores:
         sortedBookNumbers = sorted(scores.keys())
         sparseMatrix.append(sortedBookNumbers)
-    return sparseMatrix
+    return allScores, sparseMatrix

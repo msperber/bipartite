@@ -24,6 +24,9 @@ def sampleFrom15(gammas, uxjList, mj, parameters):
     if -0.00001 < mj - sigma < 0.00001:
         return ((tau+sjn)/gammas[-1])*((1.0+(gammas[-1]/(tau+sjn)))**y - 1.0)
     else:
-        return (1.0/gammas[-1])*(((tau+sjn)**(-mj+sigma)+y*((tau+sjn+gammas[-1])**(-mj+sigma)-(tau+sjn)**(-mj+sigma)))**(1.0/mj+sigma)-(tau+sjn))
+        try:
+            return (1.0/gammas[-1])*(((tau+sjn)**(-mj+sigma)+y*((tau+sjn+gammas[-1])**(-mj+sigma)-(tau+sjn)**(-mj+sigma)))**(1.0/(-mj+sigma))-(tau+sjn))
+        except ZeroDivisionError:
+            return 5
     
         

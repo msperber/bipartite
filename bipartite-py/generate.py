@@ -62,13 +62,26 @@ def main(argv=None):
         EXPECTED_NUM_PARAMS = 0
         if len(args)!=EXPECTED_NUM_PARAMS:
             raise Usage("must contain %s non-optional parameter(s)" % (EXPECTED_NUM_PARAMS))
+        if None in [gamma, alpha, tau, sigma, numReaders]:
+            raise Usage("must specify gamma, alpha, tau, sigma, numReaders")
 
         ###########################
         ## MAIN PROGRAM ###########
         ###########################
         simulationParameters = expr.Parameters(alpha, sigma, tau)
-        print gen.generateBipartiteGraph(simulationParameters, [gamma] ** numReaders)
+        scores, sparseMatrix = gen.generateBipartiteGraph(simulationParameters, [gamma] * numReaders)
+        scoresOutput = "SCORES:\n"
+        for score in scores:
+            scoresOutput += str(score) + "\n"
+        scoresOutput += "GRAPH:\n"
+        scoresOutput += str(sparseMatrix) + "\n"
+        sys.stderr.write(scoresOutput)
         
+        matrixOutput = ""
+        for line in sparseMatrix:
+            matrixOutput += " ".join([str(i) for i in sorted(line)]) + "\n"
+        sys.stdout.write(matrixOutput)
+                    
         ###########################
         ###########################
 

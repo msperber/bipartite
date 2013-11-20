@@ -20,9 +20,12 @@ def test_psiFunction_boundaries_sigma2():
 def test_psiFunction_boundaries_tau():
     assert_almost_equal(1.0, expr.psiFunction(1.0**(-0.9), expr.Parameters(0.9, 0.9, 0.0)))
     
-def test_psiTildeFunction():
-    # TODO: implement
-    assert False
+def test_psiTildeFunction_check1():
+    assert_almost_equal(expr.psiFunction(1.0**(-0.9), expr.Parameters(0.9, 0.9, 0.0)),
+                        expr.psiTildeFunction(1.0**(-0.9), 0.0, expr.Parameters(0.9, 0.9, 0.0)))
+def test_psiTildeFunction_check2():
+    assert_almost_equal(expr.psiFunction(1.0**(-0.9), expr.Parameters(0.9, 0.9, 0.2)),
+                        expr.psiTildeFunction(1.0**(-0.9), 0.2, expr.Parameters(0.9, 0.9, 0.0)))
     
 def test_kappaFunction_boundaries_sigma():
     assert_almost_equal(math.gamma(2.0)/4.0, expr.kappaFunction(2.0, 1.0, expr.Parameters(1.0, 0.0, 1.0)))
