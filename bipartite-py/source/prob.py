@@ -5,6 +5,7 @@ Created on Nov 11, 2013
 '''
 
 import random
+import math
 
 def flipCoin(p):
     '''
@@ -28,5 +29,10 @@ def sampleFrom15(gammas, uxjList, mj, parameters):
             return (1.0/gammas[-1])*(((tau+sjn)**(-mj+sigma)+y*((tau+sjn+gammas[-1])**(-mj+sigma)-(tau+sjn)**(-mj+sigma)))**(1.0/(-mj+sigma))-(tau+sjn))
         except ZeroDivisionError:
             return 5
+            
+def sampleTExp1(lam):
+    y=random.random()
+    return -math.log(1-(1-math.exp(-lam))*y )/lam
+    
     
         
