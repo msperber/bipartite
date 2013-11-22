@@ -18,7 +18,7 @@ def sampleGStarStar(lam,alpha):
 		Sampling from g** in order to perform double rejection see [Devroye 2009, p.17]
     '''
     gamma=lam**alpha *alpha*(1-alpha)
-    xi= ((2.0+sqrt(pi/2.0))*sqrt(2.0*gamma)+1.0)/pi
+    xi= (2.0+sqrt(pi/2.0))*sqrt(2.0*gamma)/pi+1.0
     psi=exp(-gamma*pi**2.0/8.0)/pi*(2.0+sqrt(pi/2.0))*sqrt(gamma*pi)
     w1= xi*sqrt(pi/(2.0*gamma))
     w2= 2.0*psi*sqrt(pi)
@@ -40,7 +40,7 @@ def sampleGStarStar(lam,alpha):
 def sampleExpTStable(lam,alpha):
     gamma=lam**alpha *alpha*(1-alpha)
     
-    xi= ((2.0+sqrt(pi/2.0))*sqrt(2.0*gamma)+1.0)/pi
+    xi= (2.0+sqrt(pi/2.0))*sqrt(2.0*gamma)/pi+1.0
     psi=exp(-gamma*pi**2.0/8.0)/pi*(2.0+sqrt(pi/2.0))*sqrt(gamma*pi)
     w1= xi*sqrt(pi/(2.0*gamma))
     w2= 2.0*psi*sqrt(pi)
@@ -61,8 +61,8 @@ def sampleExpTStable(lam,alpha):
                 if gamma< 1:
                     rhoBracket=rhoBracket+xi
                 else: 
-                    rhoBracket= rhoBracket+ xi *exp(-gamma*U**2.0/2.0)
-                rho= pi * exp(-lam**alpha*(1-zeta**(-2)))*rhoBracket/((1+sqrt(pi/2.0))*sqrt(gamma)/zeta+z)
+                    rhoBracket= rhoBracket+ xi *exp(-(gamma*U**2.0)/2.0)
+                rho= pi * exp(-lam**alpha*(1.0-zeta**(-2.0)))*rhoBracket/((1+sqrt(pi/2.0))*sqrt(gamma)/zeta+z)
                 if W*rho<1:
                     break
         a=A(U,alpha)
