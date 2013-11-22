@@ -13,6 +13,15 @@ class Parameters(object):
         self.sigma = sigma
         self.tau = tau
 
+class GraphParameters(object):
+    def __init__(self,n,K,m):
+        assert n >=0
+        assert K >= 0
+        self.n=n
+        self.K=K
+        self.m=m
+
+
 def lambdaFunction(w, parameters):
     assert w!=0.0
     alpha = parameters.alpha
