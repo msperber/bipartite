@@ -21,6 +21,7 @@ class GraphParameters(object):
         self.K=K    # number of books
         self.m=m    # number of times each book was read
         self.Ks=Ks # number of books each reader has read
+        
     @staticmethod
     def deduceFromSparseGraph(sparseMatrix):
         n=len(sparseMatrix)
@@ -37,7 +38,7 @@ class GraphParameters(object):
         for reader in sparseMatrix:
             for book in reader:
                 m[book]+=1
-        return GraphParameters(n,K,m)
+        return GraphParameters(n,K,m,Ks)
 
 
 def lambdaFunction(w, parameters):

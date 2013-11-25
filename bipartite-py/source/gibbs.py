@@ -34,7 +34,7 @@ def gibbsSampler(hyperParameters, gParameters, gammas, sparseMatrix,
                  numIterations=10000):
     #init gibbs sampler
     w = [1] * gParameters.K
-    Ks=gParmeters.Ks
+    Ks=gParameters.Ks
     m=gParameters.m  
     n=gParameters.n  
     sigma=hyperParameters.sigma
@@ -57,12 +57,12 @@ def gibbsSampler(hyperParameters, gParameters, gammas, sparseMatrix,
         loglike=0
         for i in range(n):
             loglike=loglike+Ks[i]*gammas[i]
-        loglike=loglike-psiFunction(sum(gammas),hyperParameters)
-        for j in range(K):
+        loglike=loglike-expr.psiFunction(sum(gammas),hyperParameters)
+        for j in range(gParameters.K):
             gammaSum=sum([gammas[i]*u[i].get(j, 0.0) for i in range(n)])
-            loglike+=log(kappaFunction(m[j],gammaSum,hyperParameters))
+            loglike+=log(expr.kappaFunction(m[j],gammaSum,hyperParameters))
         #contribution from w
-        for j in range(K):
+        for j in range(gParameters.K):
             gammaSum=sum([gammas[i]*u[i].get(j, 0.0) for i in range(n)])
             log(st.gamma.pdf(w[j],m[j]-sigma,loc=0,scale=1/(tau+gammaSum)))
         print loglike 
