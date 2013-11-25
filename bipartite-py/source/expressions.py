@@ -6,7 +6,7 @@ Created on Nov 11, 2013
 
 import math
 
-class Parameters(object):
+class HyperParameters(object):
     def __init__(self, alpha, sigma, tau):
         assert 0 <= sigma < 1.0
         self.alpha = alpha
@@ -17,9 +17,24 @@ class GraphParameters(object):
     def __init__(self,n,K,m):
         assert n >=0
         assert K >= 0
-        self.n=n
-        self.K=K
-        self.m=m
+        self.n=n    # number of readers
+        self.K=K    # number of books
+        self.m=m    # number of times each book was read
+    @staticmethod
+    def deduceFromSparseGraph(sparseMatrix):
+        n=len(sparseMatrix)
+        # calculate K (num books) from matrix
+        K=0
+        for row in sparseMatrix:
+            if len(row)>0:
+                K=max([K,max(row)])
+        K+=1        
+        # calculate m (num times each book was read)
+        m=[0]*K
+        for reader in sparseMatrix:
+            for book in reader:
+                m[book]+=1
+        return GraphParameters(n,K,m)
 
 
 def lambdaFunction(w, parameters):
@@ -40,7 +55,7 @@ def psiFunction(t, parameters):
 
 def psiTildeFunction(t, b, parameters):
     # sv: For GGP it follows from Equations (3) (4) and the density of the GGP that 
-    return psiFunction(t, Parameters(parameters.alpha, parameters.sigma, parameters.tau + b))
+    return psiFunction(t, HyperParameters(parameters.alpha, parameters.sigma, parameters.tau + b))
 
 def kappaFunction(n, z, parameters):
     alpha = parameters.alpha

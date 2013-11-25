@@ -16,7 +16,7 @@ def dummyDistr15(a,b,c,d): return 0.5
 def test_selectBooksForFirstReader():
     # using dummy functions: poisson distribution always returns 10, distr. (15) always 0.5
     numBooks, bookScores = gen.selectBooksForFirstReader([0],
-                                                     expr.Parameters(1.0, 0.9, 1.0),
+                                                     expr.HyperParameters(1.0, 0.9, 1.0),
                                                      poisson=dummyPoisson,
                                                      sampleFrom15=dummyDistr15
                                                      ) 
@@ -32,7 +32,7 @@ def test_selectBooksForIthReader_condition1():
                                     numBooks=initialNumBooks, 
                                     prevBookScoreList=[{0:1.1, 1:1.1}],
                                     simulationParameters=\
-                                            expr.Parameters(alpha=0.1, sigma=0.0, tau=0.5),
+                                            expr.HyperParameters(alpha=0.1, sigma=0.0, tau=0.5),
                                     poisson=lambda x,y: 2,
                                     sampleFrom15=lambda a,b,c,d: 0.3)
     assert numBooks == initialNumBooks + 2

@@ -68,7 +68,7 @@ def main(argv=None):
         ###########################
         ## MAIN PROGRAM ###########
         ###########################
-        simulationParameters = expr.Parameters(alpha, sigma, tau)
+        simulationParameters = expr.HyperParameters(alpha, sigma, tau)
         scores, sparseMatrix = gen.generateBipartiteGraph(simulationParameters, [gamma] * numReaders)
         scoresOutput = "SCORES:\n"
         for score in scores:

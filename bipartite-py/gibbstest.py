@@ -1,17 +1,15 @@
 #!/usr/bin/env python
 
-"""generate.py: Generative algorithm, creates a power-law governed bipartite graph.
-        (according to [Caron 2012, Sec. 2.4])
+"""gibbstest.py: Applies Gibbs Sampler to synthetic data (generated via the generative algo)
+        (according to [Caron 2012, Sec. 2.5 & 2.4])
 
-    Outputs a sparse matrix, where the rows are the readers, and each row contains the 
-    (whitespace-seperated) numbers of all the books read by that reader
+    Outputs a comparison of true and sampled scores
 """
 
 __author__ = "Matthias Sperber"
-__date__   = "Nov 11, 2013"
 
 def usage():
-    print """usage: generate.py [options]
+    print """usage: gibbstest.py [options]
     -h --help: print this Help message
     -g --gamma x: (Uniform) gamma parameter > 0
     -a --alpha x: Alpha parameter
@@ -24,11 +22,8 @@ import getopt
 import sys
 import source.generative_algo as gen
 import source.expressions as expr
-import source.prob as prob
 import source.gibbs as gibbs
-import random
 import matplotlib.pyplot as plt
-import copy    
 
 
 class Usage(Exception):
@@ -75,84 +70,37 @@ def main(argv=None):
         ## MAIN PROGRAM ###########
         ###########################
         gammas=[gamma] * numReaders
-        simulationParameters = expr.Parameters(alpha, sigma, tau)
-        scores, sparseMatrix = gen.generateBipartiteGraph(simulationParameters, gammas )
+        hyperParameters = expr.HyperParameters(alpha, sigma, tau)
+        scores, sparseMatrix = gen.generateBipartiteGraph(hyperParameters, gammas )
    
     
                     
-        scoresOutput = "SCORES:\n"
-        for score in scores:
-            scoresOutput += str(score) + "\n"
-        scoresOutput += "GRAPH:\n"
-        scoresOutput += str(sparseMatrix) + "\n"
+        scoresOutput = "artificial graph edges:\n"
+        for line in sparseMatrix:
+            scoresOutput += " ".join([str(i) for i in sorted(line)]) + "\n"
+        sys.stderr.write(scoresOutput)
+        scoresOutput = "\nartificial graph scores:\n"
+        for line in scores:
+            scoresOutput += str(line) + "\n"
         sys.stderr.write(scoresOutput)
         
-        matrixOutput = ""
-        for line in sparseMatrix:
-            matrixOutput += " ".join([str(i) for i in sorted(line)]) + "\n"
-        sys.stdout.write(matrixOutput)
-        
-        
+
+        gParameters=expr.GraphParameters.deduceFromSparseGraph(sparseMatrix)
+        numGibbsIterations = 10000
+        us = gibbs.gibbsSampler(hyperParameters, gParameters, gammas, sparseMatrix,
+                                numIterations = numGibbsIterations)  
             
-        n=numReaders
-        # calculate K from matrix
-        K=0
-        for row in sparseMatrix:
-            if len(row)>0:
-                K=max([K,max(row)])
-        K+=1        
-        # calculate m
-        m=[0]*K
-        for reader in sparseMatrix:
-            for book in reader:
-                m[book]+=1
-        print "m:"
-        print m 
-        
-        gParameters=expr.GraphParameters(n,K,m)
-        
-        
-        #init gibbs sampler 
-        w= [1]*K
-        
-        us = []
-        S=10000
-        
-        uModel=[]
-        for i in range(n):
-            uModel.append({})
-            for j in sparseMatrix[i]:
-                uModel[i][j]=0.5
-                
-        for s in range(S):
-            u = copy.deepcopy(uModel)
-            # sample u given w
-            gibbs.sampleUGivenGammasW(u,gammas,w,gParameters)
-            # sample w given u
-            gibbs.sampleWGivenUGammas(w,u,gammas,gParameters, simulationParameters)
-            # save u for prediction
-            us.append(u)  
-            
-        plt.hist([us[s][0][0] for s in range(S)])
-        plt.savefig("test.png")
-        print scores[0][0]
-        print "true u00=%f\n" % scores[0][0] 
-        
-              
-            
-        
-                
-                
+#        plt.hist([us[s][0][0] for s in range(len(us))])
+#        plt.savefig("test.png")
+
+        scoresOutput = "\nestimated graph scores after %s iterations:\n" % numGibbsIterations
+        for line in us[-1]:
+            scoresOutput += str(line) + "\n"
+        sys.stderr.write(scoresOutput)
+
 #          x ** (alpha - 1) * math.exp(-x / beta)
 #pdf(x) =  --------------------------------------
 #            math.gamma(alpha) * beta ** alpha
-            
-            
-                    
-            
-        
-        
-        
         
                     
         ###########################
