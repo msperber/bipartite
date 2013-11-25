@@ -2,6 +2,8 @@ from math import *
 import random
 
 
+#TODO: Maybe implement following Hoffert 2011 instead???
+
 def A(u,alpha):
     nom= sin(alpha*u)**alpha *( sin((1-alpha)*u)**(1-alpha) )
     return (nom/sin(u))**(1/(1-alpha))
@@ -16,9 +18,10 @@ def B(x,alpha):
 def sampleGStarStar(lam,alpha):
     '''
 		Sampling from g** in order to perform double rejection see [Devroye 2009, p.17]
+		with the corrections from [Hoffert 2011, p.7]
     '''
     gamma=lam**alpha *alpha*(1-alpha)
-    xi= (2.0+sqrt(pi/2.0))*sqrt(2.0*gamma)/pi+1.0
+    xi= ((2.0+sqrt(pi/2.0))*sqrt(2.0*gamma)+1.0)/pi
     psi=exp(-gamma*pi**2.0/8.0)/pi*(2.0+sqrt(pi/2.0))*sqrt(gamma*pi)
     w1= xi*sqrt(pi/(2.0*gamma))
     w2= 2.0*psi*sqrt(pi)
@@ -40,7 +43,7 @@ def sampleGStarStar(lam,alpha):
 def sampleExpTStable(lam,alpha):
     gamma=lam**alpha *alpha*(1-alpha)
     
-    xi= (2.0+sqrt(pi/2.0))*sqrt(2.0*gamma)/pi+1.0
+    xi= ((2.0+sqrt(pi/2.0))*sqrt(2.0*gamma)+1.0)/pi
     psi=exp(-gamma*pi**2.0/8.0)/pi*(2.0+sqrt(pi/2.0))*sqrt(gamma*pi)
     w1= xi*sqrt(pi/(2.0*gamma))
     w2= 2.0*psi*sqrt(pi)
@@ -80,7 +83,7 @@ def sampleExpTStable(lam,alpha):
         if Vp < a1/s:
             Np=random.gauss(0,1)
             X=m-delta*abs(Np)
-        elif Vp< a2/s:
+        elif Vp< (a1+delta)/s:
             X= m+delta*random.random()
         else:
             Ep=-log(random.random())
