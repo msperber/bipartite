@@ -13,6 +13,15 @@ class HyperParameters(object):
         self.sigma = sigma
         self.tau = tau
 
+# [Caron 2012, p.6]
+class GammasParameters(object):
+    def __init__(self, a, b):
+        #assert a>0 && b>0
+        self.a = a
+        self.b = b
+        self.tau = tau
+
+
 class GraphParameters(object):
     def __init__(self,n,K,m,Ks):
         assert n >=0
