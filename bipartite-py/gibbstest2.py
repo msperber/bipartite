@@ -1,5 +1,10 @@
 #!/usr/bin/env python
 
+# TODO: rename, or even better, make into an automated module test
+#                (nose assumes every module that contains "test" in its name 
+#                to be a nose module test, so these should be moved to the test/ dir,
+#                and contain only test functions that are evaluated automatically via asserts)
+
 """gibbstest.py: Applies Gibbs Sampler to synthetic data (generated via the generative algo)
         (according to [Caron 2012, Sec. 2.5 & 2.4])
 

@@ -9,6 +9,7 @@ from nose.tools import assert_almost_equals
 import source.generative_algo as gen
 import source.expressions as expr
 from source.prob import sampleFrom15
+from gibbstest2 import hyperParameters
 
 def dummyPoisson(x,y): return 10
 def dummyDistr15(a,b,c,d): return 0.5
@@ -42,6 +43,11 @@ def test_selectBooksForIthReader_condition1():
     print bookScores
 
 def test_generateBipartiteGraph_condition1():
-    # TODO: implement
-    assert False
+    hyperParameters = expr.HyperParameters(alpha=2.0, sigma=0.0, tau=1.0)
+    gammas=[0.5]*10
+    _, sparseMatrix = gen.generateBipartiteGraph(hyperParameters, 
+                                                      gammas, poisson=lambda x,y: 1)
+    for i in range(len(sparseMatrix)):
+        # wp1, every reader is picking exactly one new book:
+        assert i in sparseMatrix[i]
 

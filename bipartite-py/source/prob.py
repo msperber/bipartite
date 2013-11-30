@@ -28,7 +28,7 @@ def sampleFrom15(gammas, uxjList, mj, parameters):
         try:
             return (1.0/gammas[-1])*(((tau+sjn)**(-mj+sigma)+y*((tau+sjn+gammas[-1])**(-mj+sigma)-(tau+sjn)**(-mj+sigma)))**(1.0/(-mj+sigma))-(tau+sjn))
         except ZeroDivisionError:
-            return 5
+            return 5 # TODO: why 5? also, this event should never occur..
             
 def sampleTExp1(lam):
     y=random.random()

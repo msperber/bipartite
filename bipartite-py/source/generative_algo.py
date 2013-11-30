@@ -62,11 +62,11 @@ def selectBooksForIthReader(gammas, numBooks, prevBookScoreList, simulationParam
     
     return numBooks + numAdditionalBooks, bookScores
 
-def generateBipartiteGraph(simulationParameters, gammas):
-    numBooks, firstScores = selectBooksForFirstReader(gammas, simulationParameters)
+def generateBipartiteGraph(hyperParameters, gammas, poisson=numpy.random.poisson, sampleFrom15=prob.sampleFrom15):
+    numBooks, firstScores = selectBooksForFirstReader(gammas, hyperParameters, poisson=poisson, sampleFrom15=sampleFrom15)
     allScores = [firstScores]
     for _ in range(len(gammas)-1):
-        numBooks, scores = selectBooksForIthReader(gammas, numBooks, allScores, simulationParameters)
+        numBooks, scores = selectBooksForIthReader(gammas, numBooks, allScores, hyperParameters, poisson=poisson, sampleFrom15=sampleFrom15)
         allScores.append(scores)
     sparseMatrix = []
     for scores in allScores:
