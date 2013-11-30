@@ -19,9 +19,8 @@ class GammasParameters(object):
         #assert a>0 && b>0
         self.a = a
         self.b = b
-        self.tau = tau
-
-
+        
+        
 class GraphParameters(object):
     def __init__(self,n,K,m,Ks):
         assert n >=0

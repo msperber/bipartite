@@ -91,13 +91,13 @@ def gibbsSamplerPGammas(hyperParameters,gParameters, graphParameters, sparseMatr
     tau=hyperParameters.tau
     
     
-    a=gParmeters.a
-    b=gParmeters.a
+    a=gParameters.a
+    b=gParameters.b
     gammas= np.random.gamma(a,1.0/b,n)
     
     us = []
     uModel = []
-    for i in range(gParameters.n):
+    for i in range(n):
         uModel.append({})
         for j in sparseMatrix[i]:
             uModel[i][j] = 0.5
@@ -106,8 +106,8 @@ def gibbsSamplerPGammas(hyperParameters,gParameters, graphParameters, sparseMatr
     for _ in range(numIterations):
         u = copy.deepcopy(uModel)
         # sample u given w
-        sampleUGivenGammasW(u, gammas, w, gParameters) # sample w given u
-        sampleWGivenUGammas(w, u, gammas, gParameters, hyperParameters) # save u for prediction
+        sampleUGivenGammasW(u, gammas, w, graphParameters) # sample w given u
+        sampleWGivenUGammas(w, u, gammas, graphParameters, hyperParameters) # save u for prediction
         Gstar=sampleGstarGivenWGammas(hyperParameters, graphParameters,gammas)
         
         us.append(u)
