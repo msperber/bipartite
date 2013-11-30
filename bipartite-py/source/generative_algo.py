@@ -29,9 +29,9 @@ def selectBooksForFirstReader(gammas, simulationParams,
 def uScoreFromXScore(xScore):
     return math.exp(-xScore)
 
-def selectBooksForIthReader(gammas, numBooks, prevBookScoreList, simulationParameters,
+def selectBooksForIthReader(gammas, numBooks, prevBookScoreList, hyperParameters,
                             poisson=numpy.random.poisson, sampleFrom15=prob.sampleFrom15):
-    tau = simulationParameters.tau
+    tau = hyperParameters.tau
     curReaderI = len(prevBookScoreList) # (0-based reader index)
     
     numTimesRead = [] # m_j
@@ -45,20 +45,20 @@ def selectBooksForIthReader(gammas, numBooks, prevBookScoreList, simulationParam
     # consider previously read books:
     for j in range(numBooks):
         gammaUSum = sum([gammas[k]*uScoreFromXScore(prevBookScoreList[k-1].get(j, 0.0)) for k in range(curReaderI)])
-        probability = 1.0 - (expr.kappaFunction(numTimesRead[j], tau + gammas[curReaderI] + gammaUSum, simulationParameters) \
-                    / expr.kappaFunction(numTimesRead[j], tau + gammaUSum, simulationParameters))
+        probability = 1.0 - (expr.kappaFunction(numTimesRead[j], tau + gammas[curReaderI] + gammaUSum, hyperParameters) \
+                    / expr.kappaFunction(numTimesRead[j], tau + gammaUSum, hyperParameters))
         if prob.flipCoin(probability):
             bookScores[j] = 0.0
     
     # consider unread books:
-    numAdditionalBooks = poisson(expr.psiTildeFunction(gammas[curReaderI], sum([gammas[k] for k in range(curReaderI)]), simulationParameters), (1)) # TODO: sv: should be fine now double check
+    numAdditionalBooks = poisson(expr.psiTildeFunction(gammas[curReaderI], sum([gammas[k] for k in range(curReaderI)]), hyperParameters), (1))
     for j in range(numBooks, numBooks+numAdditionalBooks):
         bookScores[j] = 0.0
     
     # assign scores
     for bookNo in bookScores:
         uList = [uScoreFromXScore(prevBookScoreList[k-1].get(j, 0.0)) for k in range(curReaderI)] # if book has not been read score is zero.
-        bookScores[bookNo] = sampleFrom15(gammas[:curReaderI+1], uList, numTimesRead[bookNo] if bookNo < len(numTimesRead) else 0, simulationParameters)
+        bookScores[bookNo] = sampleFrom15(gammas[:curReaderI+1], uList, numTimesRead[bookNo] if bookNo < len(numTimesRead) else 0, hyperParameters)
     
     return numBooks + numAdditionalBooks, bookScores
 

@@ -28,6 +28,7 @@ import sys
 import source.generative_algo as gen
 import source.expressions as expr
 import source.gibbs as gibbs
+import source.graph as graph
 import matplotlib.pyplot as plt
 
 
@@ -90,7 +91,7 @@ def main(argv=None):
         sys.stderr.write(scoresOutput)
         
 
-        gParameters=expr.GraphParameters.deduceFromSparseGraph(sparseMatrix)
+        gParameters=graph.GraphParameters.deduceFromSparseGraph(sparseMatrix)
         numGibbsIterations = 10000
         us = gibbs.gibbsSampler(hyperParameters, gParameters, gammas, sparseMatrix,
                                 numIterations = numGibbsIterations)  

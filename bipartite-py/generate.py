@@ -18,6 +18,8 @@ def usage():
     -t --tau x: Tau parameter
     -s --sigma x: Sigma parameter
     -n --num-readers x: Fixed number or readers (int, >= 1)
+
+    example: generate.py -g 2 -a 5 -t 1 -s 0.5 -n 10
 """
 
 import getopt
@@ -68,8 +70,8 @@ def main(argv=None):
         ###########################
         ## MAIN PROGRAM ###########
         ###########################
-        simulationParameters = expr.HyperParameters(alpha, sigma, tau)
-        scores, sparseMatrix = gen.generateBipartiteGraph(simulationParameters, [gamma] * numReaders)
+        hyperParameters = expr.HyperParameters(alpha, sigma, tau)
+        scores, sparseMatrix = gen.generateBipartiteGraph(hyperParameters, [gamma] * numReaders)
         scoresOutput = "SCORES:\n"
         for score in scores:
             scoresOutput += str(score) + "\n"

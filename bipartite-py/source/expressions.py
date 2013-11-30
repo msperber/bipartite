@@ -21,32 +21,7 @@ class GammasParameters(object):
         self.b = b
         
         
-class GraphParameters(object):
-    def __init__(self,n,K,m,Ks):
-        assert n >=0
-        assert K >= 0
-        self.n=n    # number of readers
-        self.K=K    # number of books
-        self.m=m    # number of times each book was read
-        self.Ks=Ks # number of books each reader has read
-        
-    @staticmethod
-    def deduceFromSparseGraph(sparseMatrix):
-        n=len(sparseMatrix)
-        # calculate K (num books) from matrix
-        Ks=[]
-        K=0
-        for i in range(n):
-            Ks.append(len(sparseMatrix[i]))
-            if len(sparseMatrix[i])>0:
-                K=max([K,max(sparseMatrix[i])])
-        K+=1        
-        # calculate m (num times each book was read)
-        m=[0]*K
-        for reader in sparseMatrix:
-            for book in reader:
-                m[book]+=1
-        return GraphParameters(n,K,m,Ks)
+
 
 
 def lambdaFunction(w, parameters):
