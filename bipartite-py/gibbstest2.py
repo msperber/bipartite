@@ -62,23 +62,21 @@ def main(argv=None):
         gb=2 
         gammas=[gamma] * numReaders
         hyperParameters = expr.HyperParameters(alpha, sigma, tau)
-        scores, sparseMatrix = gen.generateBipartiteGraph(hyperParameters, gammas )
+        bGraph = gen.generateBipartiteGraph(hyperParameters, gammas )
         gamParameters = expr.GammasParameters(ga,gb)
         
                     
         scoresOutput = "artificial graph edges:\n"
-        for line in sparseMatrix:
-            scoresOutput += " ".join([str(i) for i in sorted(line)]) + "\n"
+        scoresOutput += bGraph.summarizeGraph()
         sys.stderr.write(scoresOutput)
         scoresOutput = "\nartificial graph scores:\n"
-        for line in scores:
-            scoresOutput += str(line) + "\n"
+        scoresOutput += bGraph.summarizeScores()
         sys.stderr.write(scoresOutput)
         
         
-        gParameters=graph.GraphParameters.deduceFromSparseGraph(sparseMatrix)
+        gParameters=graph.GraphParameters.deduceFromSparseGraph(bGraph)
         numGibbsIterations = 10000
-        us = gibbs.gibbsSamplerPGammas(hyperParameters, gamParameters, gParameters, sparseMatrix,
+        us = gibbs.gibbsSamplerPGammas(hyperParameters, gamParameters, gParameters, bGraph,
                                 numGibbsIterations)  
                           
         #        plt.hist([us[s][0][0] for s in range(len(us))])

@@ -18,20 +18,21 @@ class GraphParameters(object):
         self.Ks=Ks # number of books each reader has read
         
     @staticmethod
-    def deduceFromSparseGraph(sparseMatrix):
-        n=len(sparseMatrix)
+    def deduceFromSparseGraph(bipartiteGraph):
+        n=bipartiteGraph.getMaxNumReaders()
+        assert n != float("inf") # implementation not yet general enough..
         # calculate K (num books) from matrix
         Ks=[]
         K=0
         for i in range(n):
-            Ks.append(len(sparseMatrix[i]))
-            if len(sparseMatrix[i])>0:
-                K=max([K,max(sparseMatrix[i])])
+            Ks.append(len(bipartiteGraph.getBooksReadByReader(i)))
+            if Ks[-1]>0:
+                K=max([K,max(bipartiteGraph.getBooksReadByReader(i))])
         K+=1        
         # calculate m (num times each book was read)
         m=[0]*K
-        for reader in sparseMatrix:
-            for book in reader:
+        for reader in range(n):
+            for book in bipartiteGraph.getBooksReadByReader(reader):
                 m[book]+=1
         return GraphParameters(n,K,m,Ks)
 
@@ -123,6 +124,17 @@ class SparseBinaryBipartiteGraph(AbstractBipartiteGraph):
             return False
         else:
             return self.graph[readerIndex, bookIndex]==1
+    def summarizeGraph(self):
+        """
+        sample output:
+        [0] 1 2 4 5
+        [1] 1 3 4 5 6
+        [2] 2 4 5 7
+        """
+        summary = ""
+        for reader in sorted(self.getActiveReaders()):
+            summary += "[%s] %s\n" % (reader, " ".join([str(s) for s in sorted(self.getBooksReadByReader(reader))]))
+        return summary
 
 class SparseScoredBipartiteGraph(AbstractBipartiteGraph):
     def __init__(self, numReaders=None, numBooks=None):
@@ -143,3 +155,26 @@ class SparseScoredBipartiteGraph(AbstractBipartiteGraph):
             return 0.0
         else:
             return self.graph[readerIndex, bookIndex]
+    def summarizeGraph(self):
+        """
+        sample output:
+        [0] 1 2 4 5
+        [1] 1 3 4 5 6
+        [2] 2 4 5 7
+        """
+        summary = ""
+        for reader in sorted(self.getActiveReaders()):
+            summary += "[%s] %s\n" % (reader, " ".join([str(s) for s in sorted(self.getBooksReadByReader(reader))]))
+        return summary
+    def summarizeScores(self):
+        """
+        sample output:
+        [0] 1:1.5 2:2.5 4:0.1 5:0.3
+        [1] 1:0.4 3:0.2 4:0.5 5:0.1 6:0.5
+        [2] 2:0.3 4:0.2 5:0.5 7:0.2
+        """
+        summary = ""
+        for reader in sorted(self.getActiveReaders()):
+            summary += "[%s] %s\n" % (reader, " ".join([str(book)+":"+str(self.getReadingScore(reader,book)) for book in sorted(self.getBooksReadByReader(reader))]))
+        return summary
+        

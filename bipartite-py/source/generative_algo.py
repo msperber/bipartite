@@ -9,6 +9,7 @@ import numpy
 import math
 import source.prob as prob
 import source.expressions as expr    
+import source.graph as graph
 
 def selectBooksForFirstReader(gammas, simulationParams,
                               # override for module tests: 
@@ -68,8 +69,13 @@ def generateBipartiteGraph(hyperParameters, gammas, poisson=numpy.random.poisson
     for _ in range(len(gammas)-1):
         numBooks, scores = selectBooksForIthReader(gammas, numBooks, allScores, hyperParameters, poisson=poisson, sampleFrom15=sampleFrom15)
         allScores.append(scores)
-    sparseMatrix = []
-    for scores in allScores:
-        sortedBookNumbers = sorted(scores.keys())
-        sparseMatrix.append(sortedBookNumbers)
-    return allScores, sparseMatrix
+#    sparseMatrix = []
+#    for scores in allScores:
+#        sortedBookNumbers = sorted(scores.keys())
+#        sparseMatrix.append(sortedBookNumbers)
+    bGraph = graph.SparseScoredBipartiteGraph(numReaders=len(gammas))
+    for reader, scores in zip(range(len(allScores)), allScores):
+        for book in scores.keys():
+            bGraph.readBook(reader, book, scores[book])
+    return bGraph
+#    return allScores, sparseMatrix

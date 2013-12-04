@@ -155,6 +155,12 @@ def test_SparseBinaryBipartiteGraph_isReaderOfBook_infinite_valid():
     g = SparseBinaryBipartiteGraph()
     assert not g.isReaderOfBook(6, 5)
     
+def test_SparseBinaryBipartiteGraph_summarizeGraph():
+    g = SparseBinaryBipartiteGraph(numReaders=3, numBooks=5)
+    g.readBook(2, 4)
+    g.readBook(0, 3)
+    g.readBook(2, 2)
+    assert "[0] 3\n[2] 2 4\n" == g.summarizeGraph()
 ######################################
 
 def test_SparseScoredBipartiteGraph_getActiveReaders_finite():
@@ -316,4 +322,18 @@ def test_SparseScoredBipartiteGraph_getReadingScore_finite():
     assert_raises(IndexError, g.getReadingScore, 6, 5)
     assert_raises(IndexError, g.getReadingScore, 5, 10)
     assert_almost_equal(0.0, g.getReadingScore(3,0))
+    
+def test_SparseScoredBipartiteGraph_summarizeGraph():
+    g = SparseScoredBipartiteGraph(numReaders=3, numBooks=5)
+    g.readBook(2, 4, 1.5)
+    g.readBook(0, 3, 1.5)
+    g.readBook(2, 2, 1.5)
+    assert "[0] 3\n[2] 2 4\n" == g.summarizeGraph()
+def test_SparseScoredBipartiteGraph_summarizeScores():
+    g = SparseScoredBipartiteGraph(numReaders=3, numBooks=5)
+    g.readBook(2, 4, 1.0)
+    g.readBook(0, 3, 1.5)
+    g.readBook(2, 2, 2.0)
+    print g.summarizeScores()
+    assert "[0] 3:1.5\n[2] 2:2.0 4:1.0\n" == g.summarizeScores()
 

@@ -42,19 +42,21 @@ def test_selectBooksForIthReader_condition1():
 
 def test_generateBipartiteGraph_deterministicNumBooks():
     hyperParameters = expr.HyperParameters(alpha=5.0, sigma=0.0, tau=1.0)
-    gammas=[2]*10
-    _, sparseMatrix = gen.generateBipartiteGraph(hyperParameters, 
+    numReaders = 10
+    gammas=[2]*numReaders
+    bGraph = gen.generateBipartiteGraph(hyperParameters, 
                                                       gammas, poisson=lambda x,y: 1)
-    for i in range(len(sparseMatrix)):
+    for i in range(numReaders):
         # wp1, every reader is picking exactly one new book:
-        assert i in sparseMatrix[i]
+        assert bGraph.isReaderOfBook(i, i)
 
 def test_generateBipartiteGraph_deterministicScores():
     hyperParameters = expr.HyperParameters(alpha=5.0, sigma=0.0, tau=1.0)
-    gammas=[2]*10
+    numReaders = 10
+    gammas=[2]*numReaders
     fixedScore=1.5
-    scores, sparseMatrix = gen.generateBipartiteGraph(hyperParameters, 
+    bGraph = gen.generateBipartiteGraph(hyperParameters, 
                                                       gammas, sampleFrom15=lambda a,b,c,d: fixedScore)
-    for reader in range(len(sparseMatrix)):
-        for book in sparseMatrix[reader]:
-            assert_almost_equals(fixedScore, scores[reader][book])
+    for reader in range(numReaders):
+        for book in bGraph.getBooksReadByReader(reader):
+            assert_almost_equals(fixedScore, bGraph.getReadingScore(reader, book))

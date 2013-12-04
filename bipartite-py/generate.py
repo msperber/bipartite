@@ -71,17 +71,16 @@ def main(argv=None):
         ## MAIN PROGRAM ###########
         ###########################
         hyperParameters = expr.HyperParameters(alpha, sigma, tau)
-        scores, sparseMatrix = gen.generateBipartiteGraph(hyperParameters, [gamma] * numReaders)
+        bGraph = gen.generateBipartiteGraph(hyperParameters, [gamma] * numReaders)
         scoresOutput = "SCORES:\n"
-        for score in scores:
-            scoresOutput += str(score) + "\n"
+        scoresOutput += bGraph.summarizeGraph()
         scoresOutput += "GRAPH:\n"
-        scoresOutput += str(sparseMatrix) + "\n"
+        scoresOutput += bGraph.summarizeScores()
         sys.stderr.write(scoresOutput)
         
         matrixOutput = ""
-        for line in sparseMatrix:
-            matrixOutput += " ".join([str(i) for i in sorted(line)]) + "\n"
+        for reader in range(numReaders):
+            matrixOutput += " ".join([str(i) for i in sorted(bGraph.getBooksReadByReader(reader))]) + "\n"
         sys.stdout.write(matrixOutput)
                     
         ###########################

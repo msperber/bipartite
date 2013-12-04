@@ -31,7 +31,7 @@ def sampleWGivenUGammas(w,u,gammas,gParameters, simulationParams):
         gammaSum= sum([gammas[i]*u[i].get(j, 0.0) for i in range(n)])
         w[j] = random.gammavariate(m[j]-sigma,1/(tau+gammaSum))
 
-def gibbsSampler(hyperParameters, gParameters, gammas, sparseMatrix,
+def gibbsSampler(hyperParameters, gParameters, gammas, bGraph,
                  numIterations=10000):
     #init gibbs sampler
     w = [1] * gParameters.K
@@ -44,7 +44,7 @@ def gibbsSampler(hyperParameters, gParameters, gammas, sparseMatrix,
     uModel = []
     for i in range(gParameters.n):
         uModel.append({})
-        for j in sparseMatrix[i]:
+        for j in sorted(bGraph.getBooksReadByReader(i)):
             uModel[i][j] = 0.5
     
     for _ in range(numIterations):
@@ -74,7 +74,7 @@ def gibbsSampler(hyperParameters, gParameters, gammas, sparseMatrix,
     
     return us
     
-def gibbsSamplerPGammas(hyperParameters,gParameters, graphParameters, sparseMatrix,
+def gibbsSamplerPGammas(hyperParameters,gParameters, graphParameters, bGraph,
                  numIterations=10000):
     '''
         Gibbs sampler with parametric distribution on gammas [Caron 2012,p. 6]
@@ -99,7 +99,7 @@ def gibbsSamplerPGammas(hyperParameters,gParameters, graphParameters, sparseMatr
     uModel = []
     for i in range(n):
         uModel.append({})
-        for j in sparseMatrix[i]:
+        for j in sorted(bGraph.getBooksReadByReader(i)):
             uModel[i][j] = 0.5
     
     Gstar=0.0
