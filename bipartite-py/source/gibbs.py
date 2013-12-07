@@ -58,29 +58,25 @@ def gibbsSampler(hyperParameters, gParameters, gammas, bGraph,
         loglike=0
         for i in range(n):
             loglike=loglike+Ks[i]*gammas[i]
-        loglike=loglike-expr.psiFunction(sum(gammas),hyperParameters)
+        loglike=loglike-expr.psiFunction(sum(gammas), hyperParameters.alpha, hyperParameters.sigma, hyperParameters.tau)
         for j in range(gParameters.K):
             gammaSum=sum([gammas[i]*u[i].get(j, 0.0) for i in range(n)])
-            loglike+=log(expr.kappaFunction(m[j],gammaSum,hyperParameters))
+            loglike+=log(expr.kappaFunction(m[j], gammaSum, hyperParameters.alpha, hyperParameters.sigma, hyperParameters.tau))
         #contribution from w
         for j in range(gParameters.K):
             gammaSum=sum([gammas[i]*u[i].get(j, 0.0) for i in range(n)])
             log(st.gamma.pdf(w[j],m[j]-sigma,loc=0,scale=1/(tau+gammaSum)))
         print loglike 
-        
-        
-        
-        # TODO: sanity check: output likelihoods, should be increasing in most iterations 
-    
+        # TODO: likelihoods are not increasing..
     return us
     
-def gibbsSamplerPGammas(hyperParameters,gParameters, graphParameters, bGraph,
+def gibbsSamplerPGammas(hyperParameters, graphParameters, bGraph,
                  numIterations=10000):
     '''
         Gibbs sampler with parametric distribution on gammas [Caron 2012,p. 6]
     '''
     #init gibbs sampler
-    
+    assert hyperParameters.a is not None and  hyperParameters.b is not None
     
     w = [1] * graphParameters.K
     Ks=graphParameters.Ks
@@ -91,8 +87,8 @@ def gibbsSamplerPGammas(hyperParameters,gParameters, graphParameters, bGraph,
     tau=hyperParameters.tau
     
     
-    a=gParameters.a
-    b=gParameters.b
+    a=hyperParameters.a
+    b=hyperParameters.b
     gammas= np.random.gamma(a,1.0/b,n)
     
     us = []

@@ -6,6 +6,40 @@ Created on Nov 11, 2013
 
 import random
 import math
+import copy
+import numpy
+
+class HyperParameters(object):
+    def __init__(self, alpha, sigma, tau, gammas=None, a=None, b=None, numReaders=None):
+        assert 0 <= sigma < 1.0
+        self.alpha = alpha
+        self.sigma = sigma
+        self.tau = tau
+        self.gammas = gammas
+        # [Caron 2012, p.6]
+        self.a = a
+        self.b = b
+        self.numReaders = numReaders
+    def getNumReaders(self):
+        if self.numReaders is not None: return self.numReaders
+        elif self.gammas is not None: return len(self.gammas)
+        else: return None
+    @staticmethod
+    def sampleGammasIfNecessary(baseHyperParams):
+        """
+        return a COPY of the hyper parameters object, with sampled gammas in case they are
+        only specified as hyper-parameters a and b 
+        """
+        if baseHyperParams.gammas is not None:
+            hyperParametersWithGammas = baseHyperParams
+        else:
+            assert baseHyperParams.a is not None and baseHyperParams.b is not None and baseHyperParams.numReaders is not None
+            numReaders = baseHyperParams.numReaders
+            hyperParametersWithGammas = copy.deepcopy(baseHyperParams)
+            hyperParametersWithGammas.gammas = numpy.random.gamma(baseHyperParams.a,1.0/baseHyperParams.b,numReaders)
+        return hyperParametersWithGammas
+        
+
 
 def flipCoin(p):
     '''

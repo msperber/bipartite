@@ -32,5 +32,5 @@ def test_sampleFrom15_runsThrough():
     sigma=0.5
     alpha=0.2
     tau=0.5
-    prob.sampleFrom15([0.1,0.1], [0.1], sigma, expr.HyperParameters(alpha, sigma, tau))
+    prob.sampleFrom15([0.1,0.1], [0.1], sigma, prob.HyperParameters(alpha, sigma, tau))
     

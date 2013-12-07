@@ -27,6 +27,7 @@ import getopt
 import sys
 import source.generative_algo as gen
 import source.expressions as expr
+import source.prob as prob
 import source.gibbs as gibbs
 import source.graph as graph
 import matplotlib.pyplot as plt
@@ -76,8 +77,8 @@ def main(argv=None):
         ## MAIN PROGRAM ###########
         ###########################
         gammas=[gamma] * numReaders
-        hyperParameters = expr.HyperParameters(alpha, sigma, tau)
-        bGraph = gen.generateBipartiteGraph(hyperParameters, gammas )
+        hyperParameters = prob.HyperParameters(alpha, sigma, tau, gammas=gammas)
+        bGraph = gen.generateBipartiteGraph(hyperParameters)
     
                     
         scoresOutput = "artificial graph edges:\n"

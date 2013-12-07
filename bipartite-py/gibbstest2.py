@@ -21,7 +21,7 @@ def usage():
 import getopt
 import sys
 import source.generative_algo as gen
-import source.expressions as expr
+import source.prob as prob
 import source.gibbs as gibbs
 import source.graph as graph
 
@@ -61,9 +61,8 @@ def main(argv=None):
         ga=2
         gb=2 
         gammas=[gamma] * numReaders
-        hyperParameters = expr.HyperParameters(alpha, sigma, tau)
-        bGraph = gen.generateBipartiteGraph(hyperParameters, gammas )
-        gamParameters = expr.GammasParameters(ga,gb)
+        hyperParameters = prob.HyperParameters(alpha, sigma, tau, gammas=gammas, a=ga, b=gb)
+        bGraph = gen.generateBipartiteGraph(hyperParameters)
         
                     
         scoresOutput = "artificial graph edges:\n"
@@ -76,7 +75,7 @@ def main(argv=None):
         
         gParameters=graph.GraphParameters.deduceFromSparseGraph(bGraph)
         numGibbsIterations = 10000
-        us = gibbs.gibbsSamplerPGammas(hyperParameters, gamParameters, gParameters, bGraph,
+        us = gibbs.gibbsSamplerPGammas(hyperParameters, gParameters, bGraph,
                                 numGibbsIterations)  
                           
         #        plt.hist([us[s][0][0] for s in range(len(us))])
