@@ -8,3 +8,5 @@ mv ap/* .
 rmdir ap
 rm ap.tgz
 
+./make_corpus.py ap.txt ap.corpus
+
