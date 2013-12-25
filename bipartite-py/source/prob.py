@@ -7,7 +7,7 @@ Created on Nov 11, 2013
 import random
 import math
 import copy
-import numpy
+import numpy as np
 
 class HyperParameters(object):
     def __init__(self, alpha, sigma, tau, gammas=None, a=None, b=None, numReaders=None):
@@ -36,7 +36,7 @@ class HyperParameters(object):
             assert baseHyperParams.a is not None and baseHyperParams.b is not None and baseHyperParams.numReaders is not None
             numReaders = baseHyperParams.numReaders
             hyperParametersWithGammas = copy.deepcopy(baseHyperParams)
-            hyperParametersWithGammas.gammas = numpy.random.gamma(baseHyperParams.a,1.0/baseHyperParams.b,numReaders)
+            hyperParametersWithGammas.gammas = np.random.gamma(baseHyperParams.a,1.0/baseHyperParams.b,numReaders)
         return hyperParametersWithGammas
         
 
@@ -68,5 +68,11 @@ def sampleTExp1(lam):
     y=random.random()
     return -math.log(1-(1-math.exp(-lam))*y )/lam
     
-    
-        
+def sampleRightTruncatedExponential(lam, a):
+    """
+    sample ~ rExp(lambda, a), see [Caron 2012, Section 2.5]
+    """
+    sample = np.random.exponential(lam)
+    while sample > a:
+        sample = np.random.exponential(lam)
+    return sample / (1-math.exp(-lam * a))
