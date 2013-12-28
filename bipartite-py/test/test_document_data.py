@@ -193,5 +193,33 @@ def test_DocumentCorpus_loadFromCorpusFile_getVocabSize():
     corpus = DocumentCorpus.loadFromCorpusFile("test_document_data_files/sample.corpus", 
                                                lowercase=True)
     assert corpus.getVocabSize() == 74
+
+def test_DocumentCorpus_initializeByHand_wordIndexList():
+    doc1 = Document(wordIndexList = [0,1,2,4])
+    doc2 = Document(wordIndexList = [0,1,2,3,5])
+    doc3 = Document(wordIndexList = [0,2,3,6])
+    textCorpus = DocumentCorpus(documents=[doc1,doc2,doc3])
+    assert textCorpus.getVocabSize()==7
+    assert len(textCorpus)==3
+    assert len(textCorpus[0])==4
+    assert len(textCorpus[1])==5
+    assert len(textCorpus[2])==4
     
+def test_DocumentCorpus_initializeByHand_wordCounts():
+    doc1 = Document(wordCounts = {2:1,4:1})
+    doc2 = Document(wordCounts = {2:2,3:1})
+    textCorpus = DocumentCorpus(documents=[doc1,doc2])
+    assert textCorpus.getVocabSize()==5
+    assert len(textCorpus)==2
+    assert len(textCorpus[0])==2
+    assert len(textCorpus[1])==3
+    
+def test_DocumentCorpus_initializeByHand_wordCounts_Vocab():
+    doc1 = Document(wordCounts = {2:1,4:1})
+    doc2 = Document(wordCounts = {2:2,3:1})
+    textCorpus = DocumentCorpus(documents=[doc1,doc2], vocab=['a','b','c','d','e'])
+    assert textCorpus.getVocabSize()==5
+    assert len(textCorpus)==2
+    assert len(textCorpus[0])==2
+    assert len(textCorpus[1])==3
     

@@ -17,7 +17,7 @@ class Document(list):
     def __init__(self, wordCounts = None, wordIndexList = None):
         assert not (wordCounts is not None and wordIndexList is not None)
         if wordIndexList is not None:
-            self.update(wordIndexList)
+            self.extend(wordIndexList)
         elif wordCounts is not None:
            for key in wordCounts:
                for _ in range(wordCounts[key]):
@@ -30,6 +30,8 @@ class DocumentCorpus(list):
     def __init__(self, documents=[], vocab=None):
         self.extend(documents)
         self.vocab = vocab
+        if vocab is not None:
+            assert max([max(doc) for doc in documents if len(doc)>0]) + 1 <= len(vocab)
     def getVocabList(self):
         if self.vocab is None:
             raise Exception("no vocab was specified")
@@ -37,7 +39,8 @@ class DocumentCorpus(list):
             return self.vocab
     def getVocabSize(self):
         if self.vocab is None:
-            return max([max(doc.keys()) for doc in self])
+            # assume 0-indexed vocab
+            return max([max(doc) for doc in self if len(doc)>0]) + 1
         else:
             return len(self.vocab)
     def getVocabFrequencies(self):
