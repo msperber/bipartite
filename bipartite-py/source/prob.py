@@ -71,9 +71,7 @@ def sampleTExp1(lam):
 def sampleRightTruncatedExponential(lam, a):
     """
     sample ~ rExp(lambda, a), see [Caron 2012, Section 2.5]
+    use inverse CDF, see: http://www.r-bloggers.com/r-help-follow-up-truncated-exponential/
     """
-    # TODO: this can't be correct, fix
-    sample = np.random.exponential(lam)
-    while sample > a:
-        sample = np.random.exponential(lam)
-    return sample
+    y = np.random.random()
+    return -math.log(1.0-(1.0-math.exp(-a*lam))*y)/lam

@@ -5,10 +5,11 @@ Created on Dec 25, 2013
 '''
 
 import numpy as np
-import utility
-import prob
+import source.utility as utility
+import source.prob as prob
 import math
-import expressions as expr
+import source.expressions as expr
+import random
 
 class GibbsParameters(object):
     def __init__(self, numIterations):
@@ -36,6 +37,7 @@ class GibbsSamplingVariables(object):
 #        self.theta = np.empty((len(textCorpus),nTopics)) # topic proportions
         self.gammas = np.empty((vocabSize,)) # reading interest ("word popularity")
         self.w = np.empty((nTopics,)) # topic popularity
+        self.gStar = None
         
     def initWithFullTopicsAndGammasFromFrequencies(self, textCorpus, nTopics):
         # initialize variables to a consistent state
@@ -52,6 +54,28 @@ class GibbsSamplingVariables(object):
         for wordTypeIndex in range(textCorpus.getVocabSize()):
             self.gammas[wordTypeIndex,1] = float(wordFreqs[wordTypeIndex]) / float(totalNumWords) 
         self.w.fill(1.0)
+    
+    def createNewTopics(self, textCorpus, numNewTopics):
+        # TODO: make more efficient by grouping memory allocations
+        newTopicIndices = []
+        for _ in range(numNewTopics):
+            newTopicIndex = getUnusedTopicIndex(textCorpus, self.t)
+            if newTopicIndex >= self.z.shape[1]:
+                # expand z
+                newZ = np.zeros((self.z.shape[0], self.z.shape[1]+1))
+                newZ[:,-1] = self.z
+                self.z = newZ
+                # expand u
+                newU = np.zeros((self.u.shape[0], self.u.shape[1]+1))
+                newU[:,-1] = self.u
+                self.u = newU
+                # expand w
+                newW = np.zeros((self.w.shape[0]+1))
+                newW[:,-1] = self.w
+                self.w = newW
+            newTopicIndices.append(newTopicIndex)
+        assert self.z.shape == self.u.shape
+        return newTopicIndices
     
 def getActiveTopicIndices(textCorpus, t, excludeTopicsOnlyContainingWord=None):
     # TODO: make more efficient, e.g. cache
@@ -112,8 +136,9 @@ def inferTopicsCollapsedGibbs(textCorpus, hyperParameters, gibbsParameters):
         print "Gibbs sampling iteration:", iteration
         updateUs(samplingVariables)
         updateZs(textCorpus, samplingVariables, hyperParameters)
-        updateWGStars()
-        updateGammas()
+        updateWGStar(textCorpus, samplingVariables, hyperParameters)
+        updateGammas(textCorpus, samplingVariables, hyperParameters)
+        # TODO: release dead topics
         
 ########################
 ### UPDATES ############
@@ -138,7 +163,9 @@ def updateZs(textCorpus, samplingVariables, hyperParameters):
     a Metropolis algorithm to update z's and t's simultaneously 
     """
     for i in range(textCorpus.getVocabSize()):
-        for j in samplingVariables.getActiveTopicIndices(excludeTopicsOnlyContainingWord=i):
+        for j in samplingVariables.getActiveTopicIndices():
+            # if we wanted to exclude topics that contain only word i, use:
+            #     for j in samplingVariables.getActiveTopicIndices(excludeTopicsOnlyContainingWord=i):
             
             # switch z_ij between 0 and 1
             zTilde = samplingVariables.z.copy()
@@ -198,19 +225,59 @@ def updateZs(textCorpus, samplingVariables, hyperParameters):
                                           alpha=hyperParameters.alpha, 
                                           sigma=hyperParameters.sigma, 
                                           tau=hyperParameters.tau)
-        for _ in range(numNewTopics):
+        newTopicIndices = samplingVariables.createNewTopics(textCorpus, numNewTopics)
+        for newTopicIndex in newTopicIndices:
             newTopicIndex = getUnusedTopicIndex(textCorpus, samplingVariables.t)
-            # TODO:
-            # expand z matrix if necessary
-            # fill the new row with all zeros, except for word i for which it should be 1
+            # fill the new Z row with all zeros, except for word i for which it should be 1
+            for wordIndex in range(samplingVariables.z.shape[0]):
+                samplingVariables.z[wordIndex,newTopicIndex] = 0
+            samplingVariables.z[i,newTopicIndex] = 1
+
+            # initialize new u column:
+            for wordIndex in range(samplingVariables.z.shape[0]):
+                samplingVariables.u[wordIndex,newTopicIndex] = 1.0
+            samplingVariables.u[i,newTopicIndex] = \
+                    prob.sampleRightTruncatedExponential(
+                                         samplingVariables.gammas[i]*samplingVariables.w[j],
+                                         1.0)
+            
+            # initialize new w value:
+            gammaSum= sum([samplingVariables.gammas[i]*samplingVariables.u[i,j] \
+                           for i in range(textCorpus.getVocabSize())])
+            samplingVariables.w[newTopicIndex] = \
+                    random.gammavariate(getNumWordsInTopic(j, samplingVariables.z) \
+                                            -hyperParameters.sigma,
+                                        1.0/(hyperParameters.tau+gammaSum)) 
+            
+
+def updateWGStar(textCorpus, samplingVariables, hyperParameters):
+    # update w:
+    for topicIndex in getActiveTopicIndices(textCorpus, samplingVariables.t):
+        gammaSum= sum([samplingVariables.gammas[i]*samplingVariables.u[i,topicIndex] \
+               for i in range(textCorpus.getVocabSize())])
+        samplingVariables.w[topicIndex] = \
+                random.gammavariate(getNumWordsInTopic(topicIndex, samplingVariables.z) \
+                                        -hyperParameters.sigma,
+                                    1.0/(hyperParameters.tau+gammaSum)) 
+    
+    # update G*:
+    # TODO: implement sampler for exponentially tilted distribution
+    assert hyperParameters.sigma==0
+    samplingVariables.gStar = random.gammavariate(
+                                    hyperParameters.alpha,
+                                    1.0/(hyperParameters.tau+sum(samplingVariables.gammas)))
+    
+def updateGammas(textCorpus, samplingVariables, hyperParameters):
+    for wordType in textCorpus.getVocabSize():
         
-
-def updateWGStars():
-    pass
-
-def updateGammas():
-    pass
-
+        samplingVariables.gammas[wordType] = \
+            np.random.gamma(hyperParameters.aGamma + samplingVariables[wordType,:].sum(),
+                            hyperParameters.bGamma \
+                                + sum([samplingVariables.w[j]*samplingVariables.u[wordType,j]\
+                                       for j in getActiveTopicIndices(textCorpus, 
+                                                                      samplingVariables.t)]) \
+                                + samplingVariables.gStar)
+    
 ########################
 ### SAMPLING ###########
 ########################
@@ -300,7 +367,6 @@ def sampleTruncatedNumNewTopics(textCorpus, t, alphaTheta, wordType, gammas, alp
             denominator = np.gamma(len(textCorpus[doc]) + \
                                    (len(activeTopicIndices)+ num) * alphaTheta )
             factor1 *= numerator / denominator
-        # TODO: write out Poisson PDF
         k = num
         lam = expr.psiTildeFunction(gammas[wordType], 
                                     sum(gammas)-gammas[wordType],
