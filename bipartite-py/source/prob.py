@@ -64,9 +64,12 @@ def sampleFrom15(gammas, uxjList, mj, parameters):
         except ZeroDivisionError:
             return 5 # TODO: why 5? also, this event should never occur..
             
+#def sampleTExp1(lam):
+#    y=random.random()
+#    return -math.log(1-(1-math.exp(-lam))*y )/lam
+
 def sampleTExp1(lam):
-    y=random.random()
-    return -math.log(1-(1-math.exp(-lam))*y )/lam
+    return sampleRightTruncatedExponential(lam, 1.0)
     
 def sampleRightTruncatedExponential(lam, a):
     """
