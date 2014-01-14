@@ -77,19 +77,26 @@ class GibbsSamplingVariables(object):
     # thus, topics with no associated words remain "active" until releaseDeadTopics() gets called
     
     def getActiveTopics(self):
+        assert len(set(self.deadTopics).intersection(self.activeTopics))==0
         return self.activeTopics
     
     def releaseDeadTopics(self):
-        nonEmptyIndices = set()
-        for iteratingDoc in range(len(self.tLArr)):
-            for iteratingWordPos in range(len(self.tLArr[iteratingDoc])):
-                nonEmptyIndices.add(self.tLArr[iteratingDoc][iteratingWordPos])
-        emptyActiveIndices = set(self.activeTopics).difference(nonEmptyIndices)
-        
-        self.activeTopics = list(nonEmptyIndices)
-        self.deadTopics.extend(emptyActiveIndices)
+        assert len(set(self.deadTopics).intersection(self.activeTopics))==0
+        removingTopics = []
+        for topic in self.activeTopics:
+            if getNumWordTypesActivatedInTopic(topic, self.zMat)==0:
+                for i in range(len(self.tLArr)):
+                    for j in range(self.tLArr[i].shape[0]):
+                        assert self.tLArr[i][j]!=topic
+                removingTopics.append(topic)
+        for topic in removingTopics:
+            self.activeTopics.remove(topic)
+        self.deadTopics.extend(removingTopics)
+        assert len(set(self.deadTopics).intersection(self.activeTopics))==0
+        return removingTopics
     
     def createNewTopics(self, numNewTopics):
+        assert len(set(self.deadTopics).intersection(self.activeTopics))==0
         # to be on the safe side: init new zMat's with 1, new uMat's with 0.5, new wArr with 1
         # TODO: make more efficient by grouping memory allocations
         newTopics = []
@@ -120,18 +127,25 @@ class GibbsSamplingVariables(object):
             self.activeTopics.append(newTopic)
             
         assert self.zMat.shape == self.uMat.shape
+        assert len(set(self.deadTopics).intersection(self.activeTopics))==0
         return newTopics
+    
+    def removeTopic(self, topic):
+        for i in range(len(self.tLArr)):
+            for j in range(self.tLArr[i].shape[0]):
+                assert self.tLArr[i][j]!=topic
+        assert len(set(self.deadTopics).intersection(self.activeTopics))==0
+        self.deadTopics.append(topic)
+        self.activeTopics.remove(topic)
+        assert len(set(self.deadTopics).intersection(self.activeTopics))==0
 
 def getNumTopicOccurencesInDoc(topic, doc, tLArr,
                                     excludeDocWordPositions=[]):
     num = 0
-    try:
-        for iteratingWordPos in range(len(tLArr[doc])):
-            if tLArr[doc][iteratingWordPos]==topic:
-                if (doc, iteratingWordPos) not in excludeDocWordPositions:
-                    num += 1
-    except TypeError:
-        print "error"
+    for iteratingWordPos in range(len(tLArr[doc])):
+        if tLArr[doc][iteratingWordPos]==topic:
+            if (doc, iteratingWordPos) not in excludeDocWordPositions:
+                num += 1
     return num
 
 def getNumTopicAssignmentsToWordType(topic, wordType, tLArr, textCorpus, 
@@ -178,7 +192,6 @@ def inferTopicsCollapsedGibbs(textCorpus, hyperParameters, numIterations):
         assert oneIfTopicAssignmentsSupported(textCorpus, samplingVariables.tLArr, 
                                               samplingVariables.zMat)==1
         updateGammas(textCorpus, samplingVariables, hyperParameters)
-        # TODO: release dead topics
         
 ########################
 ### UPDATES ############
@@ -207,86 +220,121 @@ def updateZs(textCorpus, samplingVariables, hyperParameters):
         for iteratingTopic in samplingVariables.getActiveTopics():
             # skip the case where only topic j is active for word i: we need at
             # least one topic in which each word is activated
-            if samplingVariables.zMat[iteratingWordType,:].sum()==1 and samplingVariables.zMat[iteratingWordType,iteratingTopic]==1:
+            if utility.approx_equal(samplingVariables.zMat[iteratingWordType,:].sum(), 1) \
+                    and utility.approx_equal(
+                            samplingVariables.zMat[iteratingWordType,iteratingTopic],1):
                 continue
             
-            # skip empty (dead) topics
-            # TODO: these should be removed from the active topics
-            if getNumWordTypesActivatedInTopic(iteratingTopic, samplingVariables.zMat)==0:
-                continue
+            assert getNumWordTypesActivatedInTopic(iteratingTopic, samplingVariables.zMat)>0
             
-            assert samplingVariables.zMat[iteratingWordType,:].sum()>0
             
-            # switch z_ij between 0 and 1
-            zTilde = samplingVariables.zMat.copy()
-            zTilde[iteratingWordType,iteratingTopic] = 1 - zTilde[iteratingWordType,iteratingTopic]
-            
-            # resample invalidated topics
-            tTilde = copy.deepcopy(samplingVariables.tLArr)
             LQij = []
             for iteratingDoc in range(len(textCorpus)):
                 for iteratingWordPos in range(len(textCorpus[iteratingDoc])):
                     if textCorpus[iteratingDoc][iteratingWordPos]==iteratingWordType \
-                            and tTilde[iteratingDoc][iteratingWordPos]==iteratingTopic:
+                            and samplingVariables.tLArr[iteratingDoc][iteratingWordPos]==iteratingTopic:
                         LQij.append((iteratingDoc, iteratingWordPos))
-            for r in range(len(LQij)):
-                iteratingDoc, iteratingWordPos = LQij[r]
-                tTilde[iteratingDoc][iteratingWordPos] = sampleTGivenZT(
-                            activeTopics=samplingVariables.getActiveTopics(),
-                            doc=iteratingDoc, 
-                            wordPos=iteratingWordPos,
-                            alphaTheta=hyperParameters.alphaTheta, 
-                            alphaF=hyperParameters.alphaF,
-                            textCorpus=textCorpus,
-                            tLArr=tTilde,
-                            zMat=zTilde,
-                            excludeDocWordPositions=LQij[r+1:])
-            assert oneIfTopicAssignmentsSupported(textCorpus, samplingVariables.tLArr, 
-                                                  samplingVariables.zMat)==1
-            assert oneIfTopicAssignmentsSupported(textCorpus, tTilde, zTilde)==1
-            
-            # compute relative probabilities
-            prob1 = computeRelativeProbabilityForTZ(
-                            activeTopics=samplingVariables.getActiveTopics(),
-                            textCorpus=textCorpus, 
-                            wordType=iteratingWordType, 
-                            topic=iteratingTopic, 
-                            tLArr=tTilde, 
-                            zMat=zTilde,
-                            gammas=samplingVariables.gammas, 
-                            wArr=samplingVariables.wArr, 
-                            alphaTheta=hyperParameters.alphaTheta, 
-                            alphaF=hyperParameters.alphaF)
-            prob2 = computeRelativeProbabilityForTZ(
-                            activeTopics=samplingVariables.getActiveTopics(),
-                            textCorpus=textCorpus, 
-                            wordType=iteratingWordType, 
-                            topic=iteratingTopic, 
-                            tLArr=samplingVariables.tLArr, 
-                            zMat=samplingVariables.zMat,
-                            gammas=samplingVariables.gammas, 
-                            wArr=samplingVariables.wArr, 
-                            alphaTheta=hyperParameters.alphaTheta, 
-                            alphaF=hyperParameters.alphaF)
-            if prob2==0.0:
-                print "error: prob2 is 0!"
-                prob2 = 0.0000001 # TODO should this occur?
-#                computeRelativeProbabilityForTZ(
-#                            activeTopics=samplingVariables.getActiveTopics(),
-#                            textCorpus=textCorpus, 
-#                            wordType=iteratingWordType, 
-#                            topic=iteratingTopic, 
-#                            tLArr=samplingVariables.tLArr, 
-#                            zMat=samplingVariables.zMat,
-#                            gammas=samplingVariables.gammas, 
-#                            wArr=samplingVariables.wArr, 
-#                            alphaTheta=hyperParameters.alphaTheta, 
-#                            alphaF=hyperParameters.alphaF)
-            ratio = min(1.0, prob1/prob2)
-            # accept or reject
-            if prob.flipCoin(ratio):
-                samplingVariables.zMat = zTilde
-                samplingVariables.tLArr = tTilde
+                        
+            if utility.approx_equal(
+                    getNumWordTypesActivatedInTopic(iteratingTopic, samplingVariables.zMat), 1) \
+                    and utility.approx_equal(
+                            samplingVariables.zMat[iteratingWordType,iteratingTopic],1):
+                samplingVariables.removeTopic(iteratingTopic)
+                for r in range(len(LQij)):
+                    iteratingDoc, iteratingWordPos = LQij[r]
+                    samplingVariables.tLArr[iteratingDoc][iteratingWordPos] = sampleTGivenZT(
+                                activeTopics=samplingVariables.getActiveTopics(),
+                                doc=iteratingDoc, 
+                                wordPos=iteratingWordPos,
+                                alphaTheta=hyperParameters.alphaTheta, 
+                                alphaF=hyperParameters.alphaF,
+                                textCorpus=textCorpus,
+                                tLArr=samplingVariables.tLArr,
+                                zMat=samplingVariables.zMat,
+                                excludeDocWordPositions=LQij[r+1:])
+            else:
+                # switch z_ij between 0 and 1
+                zTilde = samplingVariables.zMat.copy()
+                zTilde[iteratingWordType,iteratingTopic] = 1 - zTilde[iteratingWordType,iteratingTopic]
+                tTilde = copy.deepcopy(samplingVariables.tLArr)
+                
+                assert oneIfTopicAssignmentsSupported(textCorpus, samplingVariables.tLArr, 
+                                                          samplingVariables.zMat) == 1
+
+                # resample topics
+                for r in range(len(LQij)):
+                    iteratingDoc, iteratingWordPos = LQij[r]
+                    tTilde[iteratingDoc][iteratingWordPos] = sampleTGivenZT(
+                                activeTopics=samplingVariables.getActiveTopics(),
+                                doc=iteratingDoc, 
+                                wordPos=iteratingWordPos,
+                                alphaTheta=hyperParameters.alphaTheta, 
+                                alphaF=hyperParameters.alphaF,
+                                textCorpus=textCorpus,
+                                tLArr=tTilde,
+                                zMat=zTilde,
+                                excludeDocWordPositions=LQij[r+1:])
+                
+                assert oneIfTopicAssignmentsSupported(textCorpus, samplingVariables.tLArr, 
+                                                          samplingVariables.zMat) == 1
+                assert oneIfTopicAssignmentsSupported(textCorpus, tTilde, zTilde) == 1
+                
+                # compute relative probabilities
+                if utility.approx_equal(
+                        getNumWordTypesActivatedInTopic(iteratingTopic, samplingVariables.zMat), 1):
+                    samplingVariables.zMat = zTilde
+                    samplingVariables.tLArr = tTilde
+                else:
+                    prob1 = computeRelativeProbabilityForTZ(
+                                    activeTopics=samplingVariables.getActiveTopics(),
+                                    textCorpus=textCorpus, 
+                                    wordType=iteratingWordType, 
+                                    topic=iteratingTopic, 
+                                    tLArr=tTilde, 
+                                    zMat=zTilde,
+                                    gammas=samplingVariables.gammas, 
+                                    wArr=samplingVariables.wArr, 
+                                    alphaTheta=hyperParameters.alphaTheta, 
+                                    alphaF=hyperParameters.alphaF)
+                    prob2 = computeRelativeProbabilityForTZ(
+                                    activeTopics=samplingVariables.getActiveTopics(),
+                                    textCorpus=textCorpus, 
+                                    wordType=iteratingWordType, 
+                                    topic=iteratingTopic, 
+                                    tLArr=samplingVariables.tLArr, 
+                                    zMat=samplingVariables.zMat,
+                                    gammas=samplingVariables.gammas, 
+                                    wArr=samplingVariables.wArr, 
+                                    alphaTheta=hyperParameters.alphaTheta, 
+                                    alphaF=hyperParameters.alphaF)
+                    if prob2==0.0:
+                        print "error: prob2 is 0! (prob2:", prob2, ")"
+                        # TODO should this occur? numerical problem?
+                        
+    #                    prob2 = 0.0000001 
+                        computeRelativeProbabilityForTZ(
+                                    activeTopics=samplingVariables.getActiveTopics(),
+                                    textCorpus=textCorpus, 
+                                    wordType=iteratingWordType, 
+                                    topic=iteratingTopic, 
+                                    tLArr=samplingVariables.tLArr, 
+                                    zMat=samplingVariables.zMat,
+                                    gammas=samplingVariables.gammas, 
+                                    wArr=samplingVariables.wArr, 
+                                    alphaTheta=hyperParameters.alphaTheta, 
+                                    alphaF=hyperParameters.alphaF)
+                    ratio = min(1.0, prob1/prob2)
+                    # accept or reject
+                    if prob.flipCoin(ratio):
+                        samplingVariables.zMat = zTilde
+                        samplingVariables.tLArr = tTilde
+        
+        # remove dead topics
+        nBefore = len(samplingVariables.getActiveTopics())
+        assert oneIfTopicAssignmentsSupported(textCorpus, samplingVariables.tLArr, 
+                                          samplingVariables.zMat) == 1
+
+        assert nBefore==len(samplingVariables.getActiveTopics())
 
         # create new topics
         numNewTopics = sampleTruncatedNumNewTopics(
@@ -302,35 +350,41 @@ def updateZs(textCorpus, samplingVariables, hyperParameters):
         newTopics = samplingVariables.createNewTopics(numNewTopics)
         wordFreqs = textCorpus.getVocabFrequencies()
         totalNumWords = textCorpus.getTotalNumWords()
-        for newTopic in newTopics:
-            # TODO: how should these topics be properly initialized?
-            # fill the new zMat row with all ones
-            for iteratingWordType in range(samplingVariables.zMat.shape[0]):
-                samplingVariables.zMat[iteratingWordType,newTopic] = 1
-            samplingVariables.wArr[newTopic] = 1.0
-            for iteratingWordType in range(samplingVariables.uMat.shape[0]):
-                samplingVariables.gammas[iteratingWordType] = \
-                        float(wordFreqs[iteratingWordType]) / float(totalNumWords) 
-                samplingVariables.uMat[iteratingWordType,newTopic] = \
-                        prob.sampleRightTruncatedExponential(
-                                 samplingVariables.gammas[iteratingWordType] \
-                                        * samplingVariables.wArr[newTopic],
-                                 1.0)
+        assert oneIfTopicAssignmentsSupported(textCorpus, samplingVariables.tLArr, 
+                                  samplingVariables.zMat) == 1
 
+        for newTopic in newTopics:
+            for i in range(len(samplingVariables.tLArr)):
+                for j in range(samplingVariables.tLArr[i].shape[0]):
+                    assert samplingVariables.tLArr[i][j]!=newTopic
+
+            # TODO: how should these topics be properly initialized?
+            samplingVariables.wArr[newTopic] = 1.0
+            for iteratingWordType2 in range(samplingVariables.uMat.shape[0]):
+                samplingVariables.gammas[iteratingWordType2] = \
+                        float(wordFreqs[iteratingWordType2]) / float(totalNumWords) 
             
-#            # fill the new zMat row with all zeros, except for word i for which it should be 1
-#            for iteratingWordType in range(samplingVariables.zMat.shape[0]):
-#                samplingVariables.zMat[iteratingWordType,newTopic] = 0
-#            samplingVariables.zMat[iteratingWordType,newTopic] = 1
-#
-#            # initialize new uMat column:
-#            for iteratingWordType in range(samplingVariables.zMat.shape[0]):
-#                samplingVariables.uMat[iteratingWordType,newTopic] = 1.0
-#            samplingVariables.uMat[iteratingWordType,newTopic] = \
-#                    prob.sampleRightTruncatedExponential(
-#                             samplingVariables.gammas[iteratingWordType] \
-#                                    * samplingVariables.wArr[iteratingTopic],
-#                             1.0)
+            # fill the new zMat row with all zeros, except for word i for which it should be 1
+            assert oneIfTopicAssignmentsSupported(textCorpus, samplingVariables.tLArr, 
+                                      samplingVariables.zMat) == 1
+
+            for iteratingWordType2 in range(samplingVariables.zMat.shape[0]):
+                samplingVariables.zMat[iteratingWordType2,newTopic] = 0
+            samplingVariables.zMat[iteratingWordType,newTopic] = 1
+            assert oneIfTopicAssignmentsSupported(textCorpus, samplingVariables.tLArr, 
+                                      samplingVariables.zMat) == 1
+
+            # initialize new uMat column:
+            for iteratingWordType2 in range(samplingVariables.zMat.shape[0]):
+                samplingVariables.uMat[iteratingWordType2,newTopic] = 1.0
+            samplingVariables.uMat[iteratingWordType,newTopic] = \
+                    prob.sampleRightTruncatedExponential(
+                             samplingVariables.gammas[iteratingWordType] \
+                                    * samplingVariables.wArr[newTopic],
+                             1.0)
+        assert oneIfTopicAssignmentsSupported(textCorpus, samplingVariables.tLArr, 
+                                  samplingVariables.zMat) == 1
+
 #            
 #            # initialize new wArr value:
 #            gammaSum= sum([samplingVariables.gammas[i]*samplingVariables.uMat[i,iteratingTopic] \
@@ -345,10 +399,7 @@ def updateZs(textCorpus, samplingVariables, hyperParameters):
 def updateWGStar(textCorpus, samplingVariables, hyperParameters):
     # update wArr:
     for iteratingTopic in samplingVariables.getActiveTopics():
-        # skip empty (dead) topics
-        # TODO: these should be removed from the active topics
-        if getNumWordTypesActivatedInTopic(iteratingTopic, samplingVariables.zMat)==0:
-            continue
+        assert getNumWordTypesActivatedInTopic(iteratingTopic, samplingVariables.zMat)>0
 
         gammaSum= sum([samplingVariables.gammas[i]*samplingVariables.uMat[i,iteratingTopic] \
                for i in range(textCorpus.getVocabSize())])
@@ -384,8 +435,14 @@ def sampleTGivenZT(activeTopics, doc, wordPos, alphaTheta, alphaF, textCorpus, t
                    zMat, excludeDocWordPositions=[]):
     unnormalizedTopicProbs = []
     wordType = textCorpus[doc][wordPos]
+    assert oneIfTopicAssignmentsSupported(textCorpus=textCorpus,
+                                          tLArr=tLArr,
+                                          zMat=zMat,
+                                          excludeDocWordPositions=[(doc, wordPos)] \
+                                                + excludeDocWordPositions) \
+                == 1
     for iteratingTopic in activeTopics:
-        if zMat[wordType,iteratingTopic]==0:
+        if utility.approx_equal(zMat[wordType,iteratingTopic], 0):
             unnormalizedTopicProbs.append(0.0)
         else:
             numerator1 = alphaTheta + getNumTopicOccurencesInDoc(iteratingTopic, doc, tLArr,
@@ -410,7 +467,7 @@ def sampleTGivenZT(activeTopics, doc, wordPos, alphaTheta, alphaF, textCorpus, t
             unnormalizedTopicProbs.append(numerator1 * numerator2 / denominator)
     normalizer = sum(unnormalizedTopicProbs)
     normalizedTopicProbs = [p / normalizer for p in unnormalizedTopicProbs]
-    return np.nonzero(np.random.multinomial(1, normalizedTopicProbs))[0][0]
+    return activeTopics[np.nonzero(np.random.multinomial(1, normalizedTopicProbs))[0][0]]
 
 def computeRelativeProbabilityForTZ(activeTopics, textCorpus, wordType, topic, tLArr, zMat, gammas, 
                                     wArr, alphaTheta, alphaF):
@@ -466,12 +523,14 @@ def computeRelativeProbabilityForTZ(activeTopics, textCorpus, wordType, topic, t
         factor4 *= subNumerator1 / subDenominator1 * subNumerator2 / subDenominator2
     return factor1 * factor2 * factor3 * factor4
 
-def oneIfTopicAssignmentsSupported(textCorpus, tLArr, zMat):
+def oneIfTopicAssignmentsSupported(textCorpus, tLArr, zMat, excludeDocWordPositions=[]):
     for iteratingDoc in range(len(tLArr)):
         for iteratingWordPos in range(len(tLArr[iteratingDoc])):
+            if (iteratingDoc, iteratingWordPos) in excludeDocWordPositions:
+                continue
             iteratingTopic = tLArr[iteratingDoc][iteratingWordPos]
             iteratingWordType = textCorpus[iteratingDoc][iteratingWordPos]
-            if zMat[iteratingWordType, iteratingTopic]!=1:
+            if not utility.approx_equal(zMat[iteratingWordType, iteratingTopic], 1):
                 return 0
     return 1
 

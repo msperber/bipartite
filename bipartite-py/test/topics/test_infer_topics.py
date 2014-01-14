@@ -18,9 +18,9 @@ class TopicsTestCase (unittest.TestCase):
     doc1 = Document(wordIndexList = [0,1,2,4])
     doc2 = Document(wordIndexList = [0,1,3,5])
     doc3 = Document(wordIndexList = [0,2,3,6])
-    textCorpus1 = DocumentCorpus(documents=[doc1,doc2,doc3])
+    textCorpus1=DocumentCorpus(documents=[doc1,doc2,doc3])
     
-    def setup_func(self):
+    def seedRandomGenerators(self):
         random.seed(13)
         np.random.seed(13)
     
@@ -100,20 +100,22 @@ class TopicsTestCase (unittest.TestCase):
     
     def test_GibbsSamplingVariables_releaseDeadTopics(self):
         sVars = GibbsSamplingVariables(self.textCorpus1, nTopics = 4)
-        
-        # make topic # 2 (and only that) a dead topic:
-        prevTopic = 0
+
         for l in range(len(self.textCorpus1)):
             for q in range(len(self.textCorpus1[l])):
-                if prevTopic==2:
-                    sVars.tLArr[l][q] = 3
-                else:
-                    sVars.tLArr[l][q] = prevTopic
-                prevTopic = (prevTopic+1) % 3
+                sVars.tLArr[l][q]=0
         
-        assert len(sVars.getActiveTopics()) == 4
+        # make topic # 2 (and only that) a dead topic:
+        for i in range(sVars.zMat.shape[0]):
+            for j in range(sVars.zMat.shape[1]):
+                if j==2:
+                    sVars.zMat[i,j] = 0
+                else:
+                    sVars.zMat[i,j] = 1
+        
+        assert len(sVars.getActiveTopics()) == sVars.zMat.shape[1]
         sVars.releaseDeadTopics()
-        assert len(sVars.getActiveTopics()) == 3
+        assert len(sVars.getActiveTopics()) == sVars.zMat.shape[1]-1
         assert_list_equal([2],sVars.createNewTopics(1)) 
         
     
@@ -180,9 +182,9 @@ class TopicsTestCase (unittest.TestCase):
         sVars.zMat[self.textCorpus1[0][0], sVars.tLArr[0][0]] = 0
         assert oneIfTopicAssignmentsSupported(self.textCorpus1, sVars.tLArr, sVars.zMat)==0
     
-    @with_setup(setup_func)
     def test_inferTopicsCollapsedGibbs_runsWithoutException(self):
-        hyperParameters = HyperParameters(alpha=5.0, sigma=0.0, tau=1.0, alphaTheta=1.0, 
+        self.seedRandomGenerators()
+        hyperParameters = HyperParameters(alpha=1.0, sigma=0.0, tau=1.0, alphaTheta=1.0, 
                                           alphaF=1.0, aGamma=1.0, bGamma=1.0)
         inferTopicsCollapsedGibbs(self.textCorpus1, hyperParameters, 10)
 #        try:
