@@ -10,7 +10,6 @@ from source.topics.infer_topics import *
 from source.document_data import *
 from source.utility import approx_equal
 from numpy.ma.testutils import assert_almost_equal
-from nltk.sem.logic import IllegalTypeException
 from nose.tools.nontrivial import nottest
 
 class TopicsTestCase (unittest.TestCase):
@@ -20,7 +19,7 @@ class TopicsTestCase (unittest.TestCase):
     doc3 = Document(wordIndexList = [0,2,3,6])
     textCorpus1=DocumentCorpus(documents=[doc1,doc2,doc3])
     
-    def seedRandomGenerators(self):
+    def seedRandomGeneratorsDeterministically(self):
         random.seed(13)
         np.random.seed(13)
     
@@ -183,10 +182,13 @@ class TopicsTestCase (unittest.TestCase):
         assert oneIfTopicAssignmentsSupported(self.textCorpus1, sVars.tLArr, sVars.zMat)==0
     
     def test_inferTopicsCollapsedGibbs_runsWithoutException(self):
-        self.seedRandomGenerators()
+        self.seedRandomGeneratorsDeterministically()
         hyperParameters = HyperParameters(alpha=1.0, sigma=0.0, tau=1.0, alphaTheta=1.0, 
                                           alphaF=1.0, aGamma=1.0, bGamma=1.0)
-        inferTopicsCollapsedGibbs(self.textCorpus1, hyperParameters, 10)
+        sv = inferTopicsCollapsedGibbs(self.textCorpus1, hyperParameters, numIterations=10, 
+                                       numInitialTopics=10)
+        print "final t matrix: ", sv.tLArr
+        assert False
 #        try:
 #            inferTopicsCollapsedGibbs(self.textCorpus1, hyperParameters, 10)
 #        except Exception:

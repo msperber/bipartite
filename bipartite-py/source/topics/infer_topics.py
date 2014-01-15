@@ -69,7 +69,7 @@ class GibbsSamplingVariables(object):
         totalNumWords = textCorpus.getTotalNumWords()
         for iteratingWordType in range(textCorpus.getVocabSize()):
             self.gammas[iteratingWordType] = \
-                        float(wordFreqs[iteratingWordType]) / float(totalNumWords) 
+                        float(wordFreqs[iteratingWordType]) / float(totalNumWords)
         self.wArr.fill(1.0)
     
     # approach to managing active & dead topics: both are stored in (complementary) lists,
@@ -131,9 +131,6 @@ class GibbsSamplingVariables(object):
         return newTopics
     
     def removeTopic(self, topic):
-        for i in range(len(self.tLArr)):
-            for j in range(self.tLArr[i].shape[0]):
-                assert self.tLArr[i][j]!=topic
         assert len(set(self.deadTopics).intersection(self.activeTopics))==0
         self.deadTopics.append(topic)
         self.activeTopics.remove(topic)
@@ -165,15 +162,21 @@ def getNumWordTypesActivatedInTopic(topic, zMat):
 def getRthActiveWordTypeInTopic(r, topic, zMat):
     return np.nonzero(zMat[:,topic])[0][r]
 
+def getNumActiveTopicsForWordType(wordType, zMat, activeTopics):
+    n = 0
+    for j in activeTopics:
+        n += zMat[wordType, j]
+    return int(n)
+
 ########################
 ### MAIN ALGORITHM #####
 ########################
 
 
-def inferTopicsCollapsedGibbs(textCorpus, hyperParameters, numIterations):
+def inferTopicsCollapsedGibbs(textCorpus, hyperParameters, numIterations, numInitialTopics=10):
     
     # initialize variables
-    samplingVariables = GibbsSamplingVariables(textCorpus, nTopics = 20)
+    samplingVariables = GibbsSamplingVariables(textCorpus, nTopics = numInitialTopics)
     
     for iteration in range(numIterations):
         print "Gibbs sampling iteration:", iteration
@@ -192,6 +195,7 @@ def inferTopicsCollapsedGibbs(textCorpus, hyperParameters, numIterations):
         assert oneIfTopicAssignmentsSupported(textCorpus, samplingVariables.tLArr, 
                                               samplingVariables.zMat)==1
         updateGammas(textCorpus, samplingVariables, hyperParameters)
+    return samplingVariables
         
 ########################
 ### UPDATES ############
@@ -220,10 +224,17 @@ def updateZs(textCorpus, samplingVariables, hyperParameters):
         for iteratingTopic in samplingVariables.getActiveTopics():
             # skip the case where only topic j is active for word i: we need at
             # least one topic in which each word is activated
-            if utility.approx_equal(samplingVariables.zMat[iteratingWordType,:].sum(), 1) \
+#            if utility.approx_equal(samplingVariables.zMat[iteratingWordType,:].sum(), 1) \
+            if getNumActiveTopicsForWordType(iteratingWordType, 
+                                             samplingVariables.zMat, 
+                                             samplingVariables.getActiveTopics()) == 1 \
                     and utility.approx_equal(
                             samplingVariables.zMat[iteratingWordType,iteratingTopic],1):
                 continue
+            
+            # skip this topic if only one topic is activated: there will be no valid proposals
+            if len(samplingVariables.getActiveTopics()) == 1:
+                break
             
             assert getNumWordTypesActivatedInTopic(iteratingTopic, samplingVariables.zMat)>0
             
@@ -235,13 +246,14 @@ def updateZs(textCorpus, samplingVariables, hyperParameters):
                             and samplingVariables.tLArr[iteratingDoc][iteratingWordPos]==iteratingTopic:
                         LQij.append((iteratingDoc, iteratingWordPos))
                         
-            if utility.approx_equal(
-                    getNumWordTypesActivatedInTopic(iteratingTopic, samplingVariables.zMat), 1) \
+            if getNumWordTypesActivatedInTopic(iteratingTopic, samplingVariables.zMat) == 1 \
                     and utility.approx_equal(
-                            samplingVariables.zMat[iteratingWordType,iteratingTopic],1):
+                            samplingVariables.zMat[iteratingWordType,iteratingTopic], 1):
                 samplingVariables.removeTopic(iteratingTopic)
                 for r in range(len(LQij)):
                     iteratingDoc, iteratingWordPos = LQij[r]
+                    # TODO: can't sample a topic here if the word had only one topic and then
+                    # we deleted that one topic..
                     samplingVariables.tLArr[iteratingDoc][iteratingWordPos] = sampleTGivenZT(
                                 activeTopics=samplingVariables.getActiveTopics(),
                                 doc=iteratingDoc, 
@@ -252,6 +264,9 @@ def updateZs(textCorpus, samplingVariables, hyperParameters):
                                 tLArr=samplingVariables.tLArr,
                                 zMat=samplingVariables.zMat,
                                 excludeDocWordPositions=LQij[r+1:])
+                for i in range(len(samplingVariables.tLArr)):
+                    for j in range(samplingVariables.tLArr[i].shape[0]):
+                        assert samplingVariables.tLArr[i][j]!=iteratingTopic
             else:
                 # switch z_ij between 0 and 1
                 zTilde = samplingVariables.zMat.copy()
@@ -280,54 +295,49 @@ def updateZs(textCorpus, samplingVariables, hyperParameters):
                 assert oneIfTopicAssignmentsSupported(textCorpus, tTilde, zTilde) == 1
                 
                 # compute relative probabilities
-                if utility.approx_equal(
-                        getNumWordTypesActivatedInTopic(iteratingTopic, samplingVariables.zMat), 1):
+                prob1 = computeRelativeProbabilityForTZ(
+                                activeTopics=samplingVariables.getActiveTopics(),
+                                textCorpus=textCorpus, 
+                                wordType=iteratingWordType, 
+                                topic=iteratingTopic, 
+                                tLArr=tTilde, 
+                                zMat=zTilde,
+                                gammas=samplingVariables.gammas, 
+                                wArr=samplingVariables.wArr, 
+                                alphaTheta=hyperParameters.alphaTheta, 
+                                alphaF=hyperParameters.alphaF)
+                prob2 = computeRelativeProbabilityForTZ(
+                                activeTopics=samplingVariables.getActiveTopics(),
+                                textCorpus=textCorpus, 
+                                wordType=iteratingWordType, 
+                                topic=iteratingTopic, 
+                                tLArr=samplingVariables.tLArr, 
+                                zMat=samplingVariables.zMat,
+                                gammas=samplingVariables.gammas, 
+                                wArr=samplingVariables.wArr, 
+                                alphaTheta=hyperParameters.alphaTheta, 
+                                alphaF=hyperParameters.alphaF)
+                if prob2==0.0:
+                    print "error: prob2 is 0! (prob2:", prob2, ")"
+                    # TODO should this occur? numerical problem?
+                    
+#                    prob2 = 0.0000001 
+#                        computeRelativeProbabilityForTZ(
+#                                    activeTopics=samplingVariables.getActiveTopics(),
+#                                    textCorpus=textCorpus, 
+#                                    wordType=iteratingWordType, 
+#                                    topic=iteratingTopic, 
+#                                    tLArr=samplingVariables.tLArr, 
+#                                    zMat=samplingVariables.zMat,
+#                                    gammas=samplingVariables.gammas, 
+#                                    wArr=samplingVariables.wArr, 
+#                                    alphaTheta=hyperParameters.alphaTheta, 
+#                                    alphaF=hyperParameters.alphaF)
+                ratio = min(1.0, prob1/prob2)
+                # accept or reject
+                if prob.flipCoin(ratio):
                     samplingVariables.zMat = zTilde
                     samplingVariables.tLArr = tTilde
-                else:
-                    prob1 = computeRelativeProbabilityForTZ(
-                                    activeTopics=samplingVariables.getActiveTopics(),
-                                    textCorpus=textCorpus, 
-                                    wordType=iteratingWordType, 
-                                    topic=iteratingTopic, 
-                                    tLArr=tTilde, 
-                                    zMat=zTilde,
-                                    gammas=samplingVariables.gammas, 
-                                    wArr=samplingVariables.wArr, 
-                                    alphaTheta=hyperParameters.alphaTheta, 
-                                    alphaF=hyperParameters.alphaF)
-                    prob2 = computeRelativeProbabilityForTZ(
-                                    activeTopics=samplingVariables.getActiveTopics(),
-                                    textCorpus=textCorpus, 
-                                    wordType=iteratingWordType, 
-                                    topic=iteratingTopic, 
-                                    tLArr=samplingVariables.tLArr, 
-                                    zMat=samplingVariables.zMat,
-                                    gammas=samplingVariables.gammas, 
-                                    wArr=samplingVariables.wArr, 
-                                    alphaTheta=hyperParameters.alphaTheta, 
-                                    alphaF=hyperParameters.alphaF)
-                    if prob2==0.0:
-                        print "error: prob2 is 0! (prob2:", prob2, ")"
-                        # TODO should this occur? numerical problem?
-                        
-    #                    prob2 = 0.0000001 
-                        computeRelativeProbabilityForTZ(
-                                    activeTopics=samplingVariables.getActiveTopics(),
-                                    textCorpus=textCorpus, 
-                                    wordType=iteratingWordType, 
-                                    topic=iteratingTopic, 
-                                    tLArr=samplingVariables.tLArr, 
-                                    zMat=samplingVariables.zMat,
-                                    gammas=samplingVariables.gammas, 
-                                    wArr=samplingVariables.wArr, 
-                                    alphaTheta=hyperParameters.alphaTheta, 
-                                    alphaF=hyperParameters.alphaF)
-                    ratio = min(1.0, prob1/prob2)
-                    # accept or reject
-                    if prob.flipCoin(ratio):
-                        samplingVariables.zMat = zTilde
-                        samplingVariables.tLArr = tTilde
         
         # remove dead topics
         nBefore = len(samplingVariables.getActiveTopics())
@@ -404,7 +414,7 @@ def updateWGStar(textCorpus, samplingVariables, hyperParameters):
         gammaSum= sum([samplingVariables.gammas[i]*samplingVariables.uMat[i,iteratingTopic] \
                for i in range(textCorpus.getVocabSize())])
         samplingVariables.wArr[iteratingTopic] = \
-                random.gammavariate(getNumWordTypesActivatedInTopic(iteratingTopic, 
+                np.random.gamma(getNumWordTypesActivatedInTopic(iteratingTopic, 
                                                                     samplingVariables.zMat) \
                                         - hyperParameters.sigma,
                                     1.0/(hyperParameters.tau+gammaSum)) 
@@ -412,7 +422,7 @@ def updateWGStar(textCorpus, samplingVariables, hyperParameters):
     # update G*:
     # TODO: implement sampler for exponentially tilted distribution
     assert hyperParameters.sigma==0.0
-    samplingVariables.gStar = random.gammavariate(
+    samplingVariables.gStar = np.random.gamma(
                                     hyperParameters.alpha,
                                     1.0/(hyperParameters.tau+sum(samplingVariables.gammas)))
     
@@ -422,10 +432,10 @@ def updateGammas(textCorpus, samplingVariables, hyperParameters):
         samplingVariables.gammas[iteratingWordType] = \
             np.random.gamma(hyperParameters.aGamma \
                                 + samplingVariables.zMat[iteratingWordType,:].sum(),
-                            hyperParameters.bGamma \
+                            1.0/(hyperParameters.bGamma \
                     + sum([samplingVariables.wArr[j]*samplingVariables.uMat[iteratingWordType,j]\
                            for j in samplingVariables.getActiveTopics()]) \
-                    + samplingVariables.gStar)
+                    + samplingVariables.gStar))
     
 ########################
 ### SAMPLING ###########
@@ -448,7 +458,7 @@ def sampleTGivenZT(activeTopics, doc, wordPos, alphaTheta, alphaF, textCorpus, t
             numerator1 = alphaTheta + getNumTopicOccurencesInDoc(iteratingTopic, doc, tLArr,
                                     excludeDocWordPositions=[(doc,iteratingTopic)] + 
                                                             excludeDocWordPositions)
-            numerator2 = np.random.gamma(alphaF + 
+            numerator2 = math.gamma(alphaF + 
                                  getNumTopicAssignmentsToWordType(topic=iteratingTopic, 
                                                                   wordType=wordType, 
                                                                   tLArr=tLArr,
@@ -466,6 +476,8 @@ def sampleTGivenZT(activeTopics, doc, wordPos, alphaTheta, alphaF, textCorpus, t
                        for r in range(getNumWordTypesActivatedInTopic(iteratingTopic, zMat))])
             unnormalizedTopicProbs.append(numerator1 * numerator2 / denominator)
     normalizer = sum(unnormalizedTopicProbs)
+    if utility.approx_equal(normalizer, 0.0):
+        print "stop!"
     normalizedTopicProbs = [p / normalizer for p in unnormalizedTopicProbs]
     return activeTopics[np.nonzero(np.random.multinomial(1, normalizedTopicProbs))[0][0]]
 
@@ -481,15 +493,15 @@ def computeRelativeProbabilityForTZ(activeTopics, textCorpus, wordType, topic, t
     factor3 = 1.0
     activeTopics = activeTopics
     for iteratingDoc in range(len(textCorpus)):
-        subNumerator1 = np.random.gamma(len(activeTopics) * alphaTheta)
-        subDenominator1 = np.random.gamma(alphaTheta) ** len(activeTopics)
+        subNumerator1 = math.gamma(len(activeTopics) * alphaTheta)
+        subDenominator1 = math.gamma(alphaTheta) ** len(activeTopics)
         subNumerator2 = 1.0
         for iteratingTopic in activeTopics:
-            subNumerator2 *= np.random.gamma(alphaTheta + 
+            subNumerator2 *= math.gamma(alphaTheta + 
                                              getNumTopicOccurencesInDoc(iteratingTopic, 
                                                                         iteratingDoc, 
                                                                         tLArr))
-        subDenominator2 = np.random.gamma(len(activeTopics)*alphaTheta \
+        subDenominator2 = math.gamma(len(activeTopics)*alphaTheta \
                                    + sum([getNumTopicOccurencesInDoc(iteratingTopic, 
                                                                      iteratingDoc, 
                                                                      tLArr) \
@@ -500,13 +512,13 @@ def computeRelativeProbabilityForTZ(activeTopics, textCorpus, wordType, topic, t
     for iteratingTopic in activeTopics:
         if getNumWordTypesActivatedInTopic(iteratingTopic, zMat) == 0:
             continue
-        subNumerator1 = np.random.gamma(
+        subNumerator1 = math.gamma(
                                 getNumWordTypesActivatedInTopic(iteratingTopic, zMat)*alphaF)
-        subDenominator1 = np.random.gamma(alphaF) ** getNumWordTypesActivatedInTopic(iteratingTopic,
+        subDenominator1 = math.gamma(alphaF) ** getNumWordTypesActivatedInTopic(iteratingTopic,
                                                                                      zMat)
         subNumerator2 = 1.0
         for r in range(getNumWordTypesActivatedInTopic(iteratingTopic, zMat)):
-            subNumerator2 *= np.random.gamma(alphaF + 
+            subNumerator2 *= math.gamma(alphaF + 
                                       getNumTopicAssignmentsToWordType(
                                                     topic=iteratingTopic, 
                                                     wordType=getRthActiveWordTypeInTopic(
@@ -515,7 +527,7 @@ def computeRelativeProbabilityForTZ(activeTopics, textCorpus, wordType, topic, t
                                                                             zMat=zMat), 
                                                     tLArr=tLArr,
                                                     textCorpus=textCorpus))
-        subDenominator2 = np.random.gamma(
+        subDenominator2 = math.gamma(
                             getNumWordTypesActivatedInTopic(iteratingTopic, zMat)*alphaF \
                                + sum([getRthActiveWordTypeInTopic(r, iteratingTopic, zMat) \
                                       for r in range(getNumWordTypesActivatedInTopic(iteratingTopic,
@@ -543,11 +555,11 @@ def sampleTruncatedNumNewTopics(activeTopics, textCorpus, tLArr, alphaTheta, wor
         for iteratingDoc in range(len(textCorpus)):
             numerator = 1.0
             for j in activeTopics:
-                numerator *= np.random.gamma(alphaTheta + \
+                numerator *= math.gamma(alphaTheta + \
                                       getNumTopicOccurencesInDoc(topic=j, 
                                                                  doc=iteratingDoc, 
                                                                  tLArr=tLArr))
-            denominator = np.random.gamma(len(textCorpus[iteratingDoc]) + \
+            denominator = math.gamma(len(textCorpus[iteratingDoc]) + \
                                    (len(activeTopics)+ num) * alphaTheta )
             factor1 *= numerator / denominator
         k = num
