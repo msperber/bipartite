@@ -4,14 +4,16 @@ Created on Dec 25, 2013
 @author: Matthias Sperber
 '''
 
-import numpy as np
-import source.utility as utility
-import source.prob as prob
-import math
-import source.expressions as expr
-import random
 import copy
+import math
+import random
 from setuptools.command.easy_install import samefile
+
+import numpy as np
+import source.expressions as expr
+import source.prob as prob
+import source.utility as utility
+
 
 class HyperParameters(object):
     def __init__(self, alpha, sigma, tau, alphaTheta, alphaF, aGamma, bGamma):
@@ -183,6 +185,7 @@ def inferTopicsCollapsedGibbs(textCorpus, hyperParameters, numIterations, numIni
         print "gammas:", samplingVariables.gammas
         print "w's:", samplingVariables.wArr
         print "u's:", samplingVariables.uMat
+        print "t matrix: ", samplingVariables.tLArr
         assert oneIfTopicAssignmentsSupported(textCorpus, samplingVariables.tLArr, 
                                               samplingVariables.zMat)==1
         updateUs(textCorpus=textCorpus, samplingVariables=samplingVariables)
@@ -293,7 +296,7 @@ def updateZs(textCorpus, samplingVariables, hyperParameters):
                 assert oneIfTopicAssignmentsSupported(textCorpus, samplingVariables.tLArr, 
                                                           samplingVariables.zMat) == 1
                 assert oneIfTopicAssignmentsSupported(textCorpus, tTilde, zTilde) == 1
-                
+                print "proposed t matrix", tTilde 
                 # compute relative probabilities
                 prob1 = computeRelativeProbabilityForTZ(
                                 activeTopics=samplingVariables.getActiveTopics(),
@@ -334,6 +337,7 @@ def updateZs(textCorpus, samplingVariables, hyperParameters):
 #                                    alphaTheta=hyperParameters.alphaTheta, 
 #                                    alphaF=hyperParameters.alphaF)
                 ratio = min(1.0, prob1/prob2)
+                print "ratio:", ratio
                 # accept or reject
                 if prob.flipCoin(ratio):
                     samplingVariables.zMat = zTilde
@@ -357,7 +361,9 @@ def updateZs(textCorpus, samplingVariables, hyperParameters):
                                           alpha=hyperParameters.alpha, 
                                           sigma=hyperParameters.sigma, 
                                           tau=hyperParameters.tau)
+        
         newTopics = samplingVariables.createNewTopics(numNewTopics)
+        print "nr new topics", numNewTopics
         wordFreqs = textCorpus.getVocabFrequencies()
         totalNumWords = textCorpus.getTotalNumWords()
         assert oneIfTopicAssignmentsSupported(textCorpus, samplingVariables.tLArr, 
@@ -555,7 +561,7 @@ def sampleTruncatedNumNewTopics(activeTopics, textCorpus, tLArr, alphaTheta, wor
         for iteratingDoc in range(len(textCorpus)):
             numerator = 1.0
             for j in activeTopics:
-                numerator *= math.gamma(alphaTheta + \
+                numerator *= math.gamma((len(activeTopics)+ num) * alphaTheta)*math.gamma(alphaTheta + \
                                       getNumTopicOccurencesInDoc(topic=j, 
                                                                  doc=iteratingDoc, 
                                                                  tLArr=tLArr))
@@ -572,6 +578,7 @@ def sampleTruncatedNumNewTopics(activeTopics, textCorpus, tLArr, alphaTheta, wor
         unnormalizedProbs.append(factor1 * factor2)
     normalizer = sum(unnormalizedProbs)
     normalizedProbs = [p / normalizer for p in unnormalizedProbs]
+    print "normalized probs", normalizedProbs
     return np.nonzero(np.random.multinomial(1, normalizedProbs))[0][0]
 
         
