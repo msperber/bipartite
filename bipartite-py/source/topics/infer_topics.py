@@ -4,16 +4,14 @@ Created on Dec 25, 2013
 @author: Matthias Sperber
 '''
 
-import copy
-import math
-import random
-from setuptools.command.easy_install import samefile
-
 import numpy as np
-import source.expressions as expr
-import source.prob as prob
 import source.utility as utility
-
+import source.prob as prob
+import math
+import source.expressions as expr
+import random
+import copy
+from setuptools.command.easy_install import samefile
 
 class HyperParameters(object):
     def __init__(self, alpha, sigma, tau, alphaTheta, alphaF, aGamma, bGamma):
@@ -185,7 +183,6 @@ def inferTopicsCollapsedGibbs(textCorpus, hyperParameters, numIterations, numIni
         print "gammas:", samplingVariables.gammas
         print "w's:", samplingVariables.wArr
         print "u's:", samplingVariables.uMat
-        print "t matrix: ", samplingVariables.tLArr
         assert oneIfTopicAssignmentsSupported(textCorpus, samplingVariables.tLArr, 
                                               samplingVariables.zMat)==1
         updateUs(textCorpus=textCorpus, samplingVariables=samplingVariables)
@@ -482,8 +479,6 @@ def sampleTGivenZT(activeTopics, doc, wordPos, alphaTheta, alphaF, textCorpus, t
                        for r in range(getNumWordTypesActivatedInTopic(iteratingTopic, zMat))])
             unnormalizedTopicProbs.append(numerator1 * numerator2 / denominator)
     normalizer = sum(unnormalizedTopicProbs)
-    if utility.approx_equal(normalizer, 0.0):
-        print "stop!"
     normalizedTopicProbs = [p / normalizer for p in unnormalizedTopicProbs]
     return activeTopics[np.nonzero(np.random.multinomial(1, normalizedTopicProbs))[0][0]]
 
@@ -561,7 +556,7 @@ def sampleTruncatedNumNewTopics(activeTopics, textCorpus, tLArr, alphaTheta, wor
         for iteratingDoc in range(len(textCorpus)):
             numerator = 1.0
             for j in activeTopics:
-                numerator *= math.gamma((len(activeTopics)+ num) * alphaTheta)*math.gamma(alphaTheta + \
+                numerator *= math.gamma(alphaTheta + \
                                       getNumTopicOccurencesInDoc(topic=j, 
                                                                  doc=iteratingDoc, 
                                                                  tLArr=tLArr))
@@ -578,7 +573,6 @@ def sampleTruncatedNumNewTopics(activeTopics, textCorpus, tLArr, alphaTheta, wor
         unnormalizedProbs.append(factor1 * factor2)
     normalizer = sum(unnormalizedProbs)
     normalizedProbs = [p / normalizer for p in unnormalizedProbs]
-    print "normalized probs", normalizedProbs
     return np.nonzero(np.random.multinomial(1, normalizedProbs))[0][0]
 
         
