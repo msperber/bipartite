@@ -183,9 +183,9 @@ class TopicsTestCase (unittest.TestCase):
     
     def test_inferTopicsCollapsedGibbs_runsWithoutException(self):
         self.seedRandomGeneratorsDeterministically()
-        hyperParameters = HyperParameters(alpha=1.2, sigma=0.0, tau=1.0, alphaTheta=1.0, 
+        hyperParameters = HyperParameters(alpha=5.0, sigma=0.0, tau=1.0, alphaTheta=1.0, 
                                           alphaF=1.0, aGamma=1.0, bGamma=1.0)
-        sv = inferTopicsCollapsedGibbs(self.textCorpus1, hyperParameters, numIterations=1000, 
+        sv = inferTopicsCollapsedGibbs(self.textCorpus1, hyperParameters, numIterations=100, 
                                        numInitialTopics=1)
         print "final t matrix: ", sv.tLArr
         assert False
