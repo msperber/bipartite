@@ -180,9 +180,9 @@ def inferTopicsCollapsedGibbs(textCorpus, hyperParameters, numIterations, numIni
     
     for iteration in range(numIterations):
         print "Gibbs sampling iteration:", iteration
-        print "gammas:", samplingVariables.gammas
-        print "w's:", samplingVariables.wArr
-        print "u's:", samplingVariables.uMat
+#        print "gammas:", samplingVariables.gammas
+#        print "w's:", samplingVariables.wArr
+#        print "u's:", samplingVariables.uMat
         assert oneIfTopicAssignmentsSupported(textCorpus, samplingVariables.tLArr, 
                                               samplingVariables.zMat)==1
         updateUs(textCorpus=textCorpus, samplingVariables=samplingVariables)
@@ -293,7 +293,7 @@ def updateZs(textCorpus, samplingVariables, hyperParameters):
                 assert oneIfTopicAssignmentsSupported(textCorpus, samplingVariables.tLArr, 
                                                           samplingVariables.zMat) == 1
                 assert oneIfTopicAssignmentsSupported(textCorpus, tTilde, zTilde) == 1
-                print "proposed t matrix", tTilde 
+#                print "proposed t matrix", tTilde 
                 # compute relative probabilities
                 prob1 = computeRelativeProbabilityForTZ(
                                 activeTopics=samplingVariables.getActiveTopics(),
@@ -334,7 +334,7 @@ def updateZs(textCorpus, samplingVariables, hyperParameters):
 #                                    alphaTheta=hyperParameters.alphaTheta, 
 #                                    alphaF=hyperParameters.alphaF)
                 ratio = min(1.0, prob1/prob2)
-                print "ratio:", ratio
+#                print "ratio:", ratio
                 # accept or reject
                 if prob.flipCoin(ratio):
                     samplingVariables.zMat = zTilde
@@ -548,28 +548,27 @@ def oneIfTopicAssignmentsSupported(textCorpus, tLArr, zMat, excludeDocWordPositi
     return 1
 
 def sampleTruncatedNumNewTopics(activeTopics, textCorpus, tLArr, alphaTheta, wordType,
-                                gammas, alpha, sigma, tau, cutoff=20):
+                                gammas, alpha, sigma, tau, cutoff=60):
     
     unnormalizedProbs = []
-    for num in range(cutoff):
+    for kiPlus in range(cutoff):
         factor1 = 1.0
         for iteratingDoc in range(len(textCorpus)):
-            numerator = 1.0
+            numerator = math.gamma((len(activeTopics)+kiPlus) * alpha)
             for j in activeTopics:
                 numerator *= math.gamma(alphaTheta + \
                                       getNumTopicOccurencesInDoc(topic=j, 
                                                                  doc=iteratingDoc, 
                                                                  tLArr=tLArr))
             denominator = math.gamma(len(textCorpus[iteratingDoc]) + \
-                                   (len(activeTopics)+ num) * alphaTheta )
+                                   (len(activeTopics)+ kiPlus) * alphaTheta )
             factor1 *= numerator / denominator
-        k = num
-        lam = expr.psiTildeFunction(gammas[wordType], 
-                                    sum(gammas)-gammas[wordType],
-                                    alpha,
-                                    sigma,
-                                    tau)
-        factor2 = lam**k * math.exp(-lam) / math.factorial(k)
+        lamPoisson = expr.psiTildeFunction(t=gammas[wordType], 
+                                    b=sum(gammas)-gammas[wordType],
+                                    alpha=alpha,
+                                    sigma=sigma,
+                                    tau=tau)
+        factor2 = lamPoisson**kiPlus * math.exp(-lamPoisson) / math.factorial(kiPlus)
         unnormalizedProbs.append(factor1 * factor2)
     normalizer = sum(unnormalizedProbs)
     normalizedProbs = [p / normalizer for p in unnormalizedProbs]
