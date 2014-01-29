@@ -1,115 +1,134 @@
+# based on code by Francois Caron
+
+import numpy as np
+import sys
+
 from math import *
-import random
+def establernd(V0,alpha,tau,n):
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#% Random variate generation for the exponentially tilted stable distribution 
+#% with Laplace transform (in z)
+#% exp(-V0 * ((z + tau)**alpha - tau**alpha))
+#% Uses the algorithm proposed in (Devroye, 2009) 
+#% with corrections pointed out in (Hofert, 2011)
+#%
+#% References:
+#% Luc Devroye. Random variate generation for exponentially and polynomially
+#% tilted stable distributions. ACM Transactions on Modeling and Computer
+#% Simulation, vol. 19(4), 2009.
+#%
+#% Marius Hofert. Sampling exponentially tilted stable distributions. ACM Transactions on Modeling and Computer
+#% Simulation, vol. 22(1), 2011.
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#% Franois Caron
+#% INRIA Bordeaux Sud-Ouest
+#% May 2012
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#
+#% Check parameters
+    assert alpha >0 and alpha <1
+    assert tau >= 0
+    assert V0 >0 
+
+    lamb = tau * V0**(1.0/alpha)
+    lam_alpha = tau**alpha * V0 
 
 
-#TODO: Maybe implement following Hoffert 2011 instead???
 
-def A(u,alpha):
-    nom= sin(alpha*u)**alpha *( sin((1-alpha)*u)**(1-alpha) )
-    return (nom/sin(u))**(1/(1-alpha))
+    #% sigma, lam, as in (Devroye, 2009)
+    gamma = lam_alpha * alpha * (1.0-alpha)
+
+    xi = 1/pi *((2+sqrt(pi/2.0)) * sqrt(2.0*gamma) + 1.0)# Correction in Hofert
+    psi = 1.0/pi * exp(-gamma * pi**2/8) * (2 + sqrt(pi/2.0)) * sqrt(gamma * pi)
+    w1 = xi * sqrt(pi/2.0/gamma)
+    w2 = 2.0 * psi * sqrt(pi)
+    w3 = xi * pi
+    b = (1.0-alpha)/alpha
+
+    samples = np.zeros(n)
+    for i in range(n):
+        while 1:
+            # generate U with density g*/G*
+            while 1:
+                #Generate U with density proportional to g**
+                U = gen_U(w1, w2, w3, gamma)
     
-def B(x,alpha):
-    if abs(x)<1.0E-6:
-        return alpha**(-alpha)*(1-alpha)**(-(1-alpha))
-    return sin(x)/(sin(alpha*x)**alpha*(sin(1-alpha)*x)**(1-alpha))
-
-	
-
-def sampleGStarStar(lam,alpha):
-    '''
-		Sampling from g** in order to perform double rejection see [Devroye 2009, p.17]
-		with the corrections from [Hoffert 2011, p.7]
-    '''
-    gamma=lam**alpha *alpha*(1-alpha)
-    xi= ((2.0+sqrt(pi/2.0))*sqrt(2.0*gamma)+1.0)/pi
-    psi=exp(-gamma*pi**2.0/8.0)/pi*(2.0+sqrt(pi/2.0))*sqrt(gamma*pi)
-    w1= xi*sqrt(pi/(2.0*gamma))
-    w2= 2.0*psi*sqrt(pi)
-    w3= xi*psi
-    V=random.random()
-    W=random.random()
-    if gamma>= 1:
-        if V<= w1/(w1+w2):
-	   return abs(random.gauss(0,1/sqrt(gamma)))
-	else:
-	   return pi * (1-W**2)
-    else:
-        if V<= w3/(w2+w3):
-	   return pi *W
-	else:
-            return pi * (1-W**2)
-            
-            
-def sampleExpTStable(lam,alpha):
-    gamma=lam**alpha *alpha*(1-alpha)
-    
-    xi= ((2.0+sqrt(pi/2.0))*sqrt(2.0*gamma)+1.0)/pi
-    psi=exp(-gamma*pi**2.0/8.0)/pi*(2.0+sqrt(pi/2.0))*sqrt(gamma*pi)
-    w1= xi*sqrt(pi/(2.0*gamma))
-    w2= 2.0*psi*sqrt(pi)
-    w3= xi*psi
-    b=(1-alpha)/alpha
-    
-    while True:
-        while True:
-            U=sampleGStarStar(lam,alpha)
-            W=random.random()
-            zeta =sqrt( B(U,alpha)/B(0,alpha))
-            phi= (sqrt(gamma)+alpha*zeta)**(1.0/alpha)
-            z=phi/( phi-sqrt(gamma)**(1.0/alpha) )
-            #calculate big Bracket in definiton of rho
-            rhoBracket=0
-            if U<pi:
-                rhoBracket=rhoBracket+psi/sqrt(pi-U)
-                if gamma< 1:
-                    rhoBracket=rhoBracket+xi
-                else: 
-                    rhoBracket= rhoBracket+ xi *exp(-(gamma*U**2.0)/2.0)
-                rho= pi * exp(-lam**alpha*(1.0-zeta**(-2.0)))*rhoBracket/((1+sqrt(pi/2.0))*sqrt(gamma)/zeta+z)
-                if W*rho<1:
-                    break
-        a=A(U,alpha)
-        m=(b *lam/a)**alpha
-        delta = sqrt(m*alpha/a)
-        a1=delta*sqrt(pi/2.0)
-        a2=delta
-        a3=z/a
-        s=a1+a2+a3
-        Vp=random.random()
-        X=0
-        Np=0
-        Ep=0
-        
-        if Vp < a1/s:
-            Np=random.gauss(0,1)
-            X=m-delta*abs(Np)
-        elif Vp< (a1+delta)/s:
-            X= m+delta*random.random()
-        else:
-            Ep=-log(random.random())
-            X= m+delta+Ep*a3
-        
-        if X>=0:
-            E=-log(random.random())
-            LHS= a*(X-m)+lam*(X**(-b)-m**(-b))
-            if X<m:
-                LHS=LHS-Np**2.0/2.0
-            elif X>m+delta:
-                LHS=LHS-Ep
-            if LHS<=E:
-                break
-    return 1/X**b
-            
-        
-for i in range(1000):
-    sampleExpTStable(2,0.4)        
-        
-        
+                W = np.random.rand()
+                zeta = sqrt(ratio_B(U, alpha))
+                z = 1.0/(1.0 - (1.0 + alpha*zeta/sqrt(gamma))**(-1.0/alpha))
+#                 print "lam_alpha ", lam_alpha , " zeta ", zeta , "\n"
+#                 print "T1 ",  pi * exp(-lam_alpha * (1.0-zeta**(-2.0))), "\n" 
+#                 sys.stdout.flush()
                 
-                 
-            
-            
-			
+                         
+                T2= (xi * exp(-gamma*U**2/2.0) * (U>=0)*(gamma>=1.0) + psi/sqrt(pi-U)* (U>0)*(U<pi) + xi *(U>=0)*(U<=pi)*(gamma<1.0))                                                      
+                logRho = log(pi)+(-lam_alpha * (1.0-zeta**(-2.0)))+log(T2)-log((1.0 + sqrt(pi/2.0)) *sqrt(gamma)/zeta + z)
+                
+                
+                #rho = pi * exp(-lam_alpha * (1.0-zeta**(-2.0))) \
+                #    * (xi * exp(-gamma*U**2/2.0) * (U>=0)*(gamma>=1.0) + psi/sqrt(pi-U)* (U>0)*(U<pi) + xi *(U>=0)*(U<=pi)*(gamma<1.0)) \
+                #    /((1.0 + sqrt(pi/2.0)) *sqrt(gamma)/zeta + z)
+                
+                     
+                if (U<pi and logRho<=-log(W)):
+                    break
+                
     
+            # Generate X with density proportional to g(x, U)
+            a = zolotarev(U, alpha)
+            m = (b/a)**alpha * lam_alpha
+            delta = sqrt(m*alpha/a)
+            a1 = delta * sqrt(pi/2.0)
+            a2 = delta
+            a2 = a1 + delta # correction in Hofert
+            a3 = z/a
+            s = a1 + delta + a3 # correction in Hofert
+            V_p = np.random.rand()    
+            N_p = np.random.normal()
+            E_p = np.random.exponential()
+            if V_p<a1/s:
+                X = m - delta*abs(N_p)
+            elif V_p<a2/s:
+                X = delta * np.random.rand() + m
+            else:
+                X = m + delta + a3 * E_p
+    
+            E = np.random.exponential()
+    
+            cond = (a*(X-m) + exp(1.0/alpha*log(lam_alpha)-b*log(m))*((m/X)**b - 1.0) - N_p**2/2.0 * (X<m) - E_p * (X>m+delta))
+            if (X>=0) and (cond <=E):
+                break
+    
+        samples[i] = exp( 1.0/alpha* log(V0) -b*log(X)) # more stable than V0**(1/alpha) * X**(-b)
+        
+    return samples
 
 
+def gen_U(w1, w2, w3, gamma):
+    V = np.random.rand()
+    W_p = np.random.rand()
+    if gamma>=1.0:
+        if (V < w1/(w1+w2)):
+            U = abs(np.random.normal()) /sqrt(gamma)
+        else:
+            U = pi * (1.0 - W_p**2)    
+    else:
+        if (V < w3/(w3 + w2)):
+            U = pi * W_p
+        else:
+            U = pi * (1.0 - W_p**2)
+    return U
+
+
+def ratio_B(x, sigma):
+    return sinc(x) / (sinc(sigma * x))**sigma / (sinc((1.0-sigma)*x))**(1.0-sigma)
+
+
+def sinc(x):
+    return sin(x)/x
+
+
+def zolotarev(u, sigma):
+# Zolotarev function, cf (Devroye, 2009)
+   return  ((sin(sigma*u))**sigma * (sin((1.0-sigma)*u))**(1.0-sigma) / sin(u))**(1.0/(1.0-sigma))

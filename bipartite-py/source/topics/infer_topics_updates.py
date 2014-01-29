@@ -11,6 +11,8 @@ import math
 import source.expressions as expr
 import random
 import copy
+from source.exptiltedstable import *
+
 from infer_topics_state import *
 
 ########################
@@ -256,10 +258,17 @@ def updateWGStar(textCorpus, samplingVariables, hyperParameters):
     
     # update G*:
     # TODO: implement sampler for exponentially tilted distribution
-    assert hyperParameters.sigma==0.0
-    samplingVariables.gStar = np.random.gamma(
+    # 
+
+    if (utility.approx_equal( hyperParameters.sigma,0)):
+        samplingVariables.gStar = np.random.gamma(
                                     hyperParameters.alpha,
                                     1.0/(hyperParameters.tau+sum(samplingVariables.gammas)))
+    #elif utility.approx_equal( hyperParameters.sigma,0.5):
+    else :
+        samplingVariables.gStar = establernd(hyperParameters.alpha/hyperParameters.sigma,hyperParameters.sigma,
+                                             1.0/(hyperParameters.tau+sum(samplingVariables.gammas)),1)[0]
+        
     
 def updateGammas(textCorpus, samplingVariables, hyperParameters):
     for iteratingWordType in range(textCorpus.getVocabSize()):
@@ -386,3 +395,8 @@ def sampleTruncatedNumNewTopics(activeTopics, textCorpus, tLArr, alphaTheta, wor
     normalizer = sum(unnormalizedProbs)
     normalizedProbs = [p / normalizer for p in unnormalizedProbs]
     return np.nonzero(np.random.multinomial(1, normalizedProbs))[0][0]
+
+# Computes the log Equation (11) in the paper
+#def computeLMarginDistribution(gammas):
+#    factor1= gammas
+
