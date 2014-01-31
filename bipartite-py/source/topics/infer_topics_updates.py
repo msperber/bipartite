@@ -14,6 +14,7 @@ import copy
 from source.exptiltedstable import *
 
 from infer_topics_state import *
+from source.expressions import psiTildeFunction, kappaFunction
 
 ########################
 ### UPDATES ############
@@ -397,6 +398,22 @@ def sampleTruncatedNumNewTopics(activeTopics, textCorpus, tLArr, alphaTheta, wor
     return np.nonzero(np.random.multinomial(1, normalizedProbs))[0][0]
 
 # Computes the log Equation (11) in the paper
-#def computeLMarginDistribution(gammas):
-#    factor1= gammas
-
+def computeLMarginDistribution(textCorpus, samplingVariables, zMat, uMat, activeTopics, hyperParams):
+    
+    factor1 = 1.0
+    for iteratingWordType in range(textCorpus.getVocabSize()):
+        factor1 *= samplingVariables.gammas[iteratingWordType] \
+                ** getNumActiveTopicsForWordType(iteratingWordType, zMat, activeTopics)
+                
+    factor2 = math.exp(-psiTildeFunction(sum(samplingVariables.gammas)))
+    
+    factor3 = 1.0
+    for iteratingTopic in activeTopics:
+        sumGammaU = 0.0
+        for iteratingWordType in range(textCorpus.getVocabSize()):
+            sumGammaU += samplingVariables.gammas[iteratingWordType] * uMat[iteratingWordType][iteratingTopic]
+        h(theta_iteratingTopic) * kappaFunction(getNumWordTypesActivatedInTopic(iteratingTopic, zMat),
+                                                 sumGammaU,
+                                                 hyperParams.alpha, hyperParams.sigma, 
+                                                 hyperParams.tau)
+    return factor1 * factor2 * factor3
