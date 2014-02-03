@@ -4,6 +4,7 @@ from source.exptiltedstable import *
 from scipy import integrate
 from numpy import *
 from pylab import *
+from nose.tools import nottest
 
 def etstablepdf(x, V0, alpha, tau):
 
@@ -55,25 +56,26 @@ def  zolotarev(u, sigma):
 
 
 # Check if empirical cdf is approx equal to true cdf
-
-alpha = 1.0
-tau = 1.0
-sigma = 0.1
-n = 10000
-samples = establernd(alpha/sigma, sigma, tau, n)
-
-pas = .01
-x0 =  np.arange(pas,10,pas)
-out = np.zeros(x0.size)
-for i in range(x0.size):
-    out[i] = etstablepdf(x0[i], alpha/sigma, sigma, tau)[0]
-
-#plt.hist(samples, n, range, normed, weights, cumulative, bottom, histtype, align, orientation, rwidth, log, color, label, hold)
-
-figure(0)
-hist(samples, n, cumulative=True, color='green',normed=True)
-plot(x0,pas*cumsum(out))
-show()
+@nottest # takes a lot of time so enable only when needed
+def testEmpiricalCdfApproximatesTrueCdf():
+    alpha = 1.0
+    tau = 1.0
+    sigma = 0.1
+    n = 10000
+    samples = establernd(alpha/sigma, sigma, tau, n)
+    
+    pas = .01
+    x0 =  np.arange(pas,10,pas)
+    out = np.zeros(x0.size)
+    for i in range(x0.size):
+        out[i] = etstablepdf(x0[i], alpha/sigma, sigma, tau)[0]
+    
+    #plt.hist(samples, n, range, normed, weights, cumulative, bottom, histtype, align, orientation, rwidth, log, color, label, hold)
+    
+    figure(0)
+    hist(samples, n, cumulative=True, color='green',normed=True)
+    plot(x0,pas*cumsum(out))
+    show()
 
 
 # % Check computational time w.r.t. sigma
