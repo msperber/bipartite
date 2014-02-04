@@ -1,58 +1,31 @@
 #!/usr/bin/env python
 
-"""SCRIPTNAME_MARKER.py: Description of script
+"""
+Description
 
+Usage:
+  template.py [options]
+
+Options:
+    (as always: -h for help)
 """
 
-__author__ = "Matthias Sperber"
+__author__ = "AUTHOR_MARKER"
 __date__   = "DATE_MARKER"
 
-def usage():
-	print """usage: SCRIPTNAME_MARKER.py [options] args
-	-h --help: print this Help message
-"""
 
-import getopt
+import docopt
 import sys
-
-class Usage(Exception):
-    def __init__(self, msg):
-        self.msg = msg
-class ModuleTest(Exception):
-    def __init__(self, msg):
-        self.msg = msg
+import operator
 
 
 def main(argv=None):
-    if argv is None:
-        argv = sys.argv
-    try:
-		try:
-			optlist, args = getopt.getopt(argv[1:], 'h', ['help'])
-		except getopt.GetoptError, msg:
-			raise Usage(msg)
-		for o, a in optlist:
-			if o in ["-h", "--help"]:
-				usage()
-				exit(2)
-		EXPECTED_NUM_PARAMS = 0
-		if len(args)!=EXPECTED_NUM_PARAMS:
-			raise Usage("must contain %s non-optional parameter(s)" % (EXPECTED_NUM_PARAMS))
+	arguments = docopt.docopt(__doc__, options_first=True, argv=argv)
 
-		###########################
-		## MAIN PROGRAM ###########
-		###########################
-		
-		
-		###########################
-		###########################
-
-    except Usage, err:
-        print >>sys.stderr, err.msg
-        print >>sys.stderr, "for help use --help"
-        return 2
+	###########################
+	## MAIN PROGRAM ###########
+	###########################
 
 
 if __name__ == "__main__":
-    sys.exit(main())
-    
+	sys.exit(main())
