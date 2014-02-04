@@ -124,8 +124,8 @@ class GibbsCounts(object):
     def __init__(self, textCorpus, samplingVariables):
         self.numTopicOccurencesInDoc = {}
         self.numTopicAssignmentsToWordType = {}
-        self.numWordTypesActivatedInTopic = {} # check
-        self.numActiveTopicsForWordType = {} # check
+        self.numWordTypesActivatedInTopic = {}
+        self.numActiveTopicsForWordType = {}
         for topic in samplingVariables.getActiveTopics():
             for docId in range(len(textCorpus)):
                 self.numTopicOccurencesInDoc[docId, topic] = \
@@ -163,6 +163,8 @@ class GibbsCounts(object):
     def getNumTopicAssignmentsToWordTypeExcl(wordType, topic, tLArr, textCorpus,
                                      numTopicAssignmentsToWordTypeDict, excludeDocWordPositions):
         exclSum = 0
+        # make sure we don't exclude a word twice for some reason:
+        excludeDocWordPositions = list(set(excludeDocWordPositions))
         for (doc, iteratingWordPos) in excludeDocWordPositions:
             if tLArr[doc][iteratingWordPos]==topic and textCorpus[doc][iteratingWordPos]==wordType:
                 exclSum += 1

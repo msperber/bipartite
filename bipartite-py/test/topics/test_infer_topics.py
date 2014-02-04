@@ -11,6 +11,8 @@ from source.document_data import *
 from source.utility import approx_equal
 from numpy.ma.testutils import assert_almost_equal
 from nose.tools.nontrivial import nottest
+from django.db.backends.dummy.base import ignore
+from source.topics.infer_topics_hyperparam import HyperParameters
 
 class TopicsTestCase (unittest.TestCase):
     
@@ -189,7 +191,3 @@ class TopicsTestCase (unittest.TestCase):
                                        numInitialTopics=1)
         print "final t matrix: ", sv.tLArr
         assert False
-#        try:
-#            inferTopicsCollapsedGibbs(self.textCorpus1, hyperParameters, 10)
-#        except Exception:
-#            self.fail("inferTopicsCollapsedGibbs() throws an exception")

@@ -244,7 +244,43 @@ def createNewTopics(iteratingWordType, textCorpus, samplingVariables, hyperParam
                                 * samplingVariables.wArr[newTopic],
                          1.0)
 
+def updateTs(textCorpus, samplingVariables, hyperParameters):
+    for iteratingDocument in range(len(textCorpus)):
+        for iteratingWordPos in range(len(textCorpus[iteratingDocument])):
+            prevTopic = samplingVariables.tLArr[iteratingDocument][iteratingWordPos]
+            newTopic = \
+                    sampleTGivenZT(activeTopics=samplingVariables.getActiveTopics(),
+                            doc=iteratingDocument,
+                            wordPos=iteratingWordPos, 
+                            alphaTheta=hyperParameters.alphaTheta,
+                            alphaF=hyperParameters.alphaF, 
+                            textCorpus=textCorpus, 
+                            tLArr=samplingVariables.tLArr, 
+                            zMat=samplingVariables.zMat,
+                            numWordTypesActivatedInTopics=samplingVariables.counts.numWordTypesActivatedInTopic, 
+                            numTopicAssignmentsToWordType=samplingVariables.counts.numTopicAssignmentsToWordType, 
+                            excludeDocWordPositions=[(iteratingDocument, iteratingWordPos)])
+            samplingVariables.tLArr[iteratingDocument][iteratingWordPos] = newTopic
+            samplingVariables.counts.numTopicAssignmentsToWordType[ \
+                                    textCorpus[iteratingDocument][iteratingWordPos],
+                                    prevTopic] \
+                            = samplingVariables.counts.numTopicAssignmentsToWordType.get(( \
+                                    textCorpus[iteratingDocument][iteratingWordPos],
+                                    prevTopic),0) - 1
+            samplingVariables.counts.numTopicAssignmentsToWordType[ \
+                                textCorpus[iteratingDocument][iteratingWordPos],
+                                newTopic] \
+                        = samplingVariables.counts.numTopicAssignmentsToWordType.get(( \
+                                textCorpus[iteratingDocument][iteratingWordPos],
+                                newTopic), 0) + 1
+            samplingVariables.counts.numTopicOccurencesInDoc[iteratingDocument,prevTopic] = \
+                    samplingVariables.counts.numTopicOccurencesInDoc.get((iteratingDocument,prevTopic),0) \
+                    -1
+            samplingVariables.counts.numTopicOccurencesInDoc[iteratingDocument,newTopic] = \
+                    samplingVariables.counts.numTopicOccurencesInDoc.get((iteratingDocument,newTopic),0) \
+                    +1
 
+    
 def updateWGStar(textCorpus, samplingVariables, hyperParameters):
     # update wArr:
     for iteratingTopic in samplingVariables.getActiveTopics():
@@ -297,7 +333,15 @@ def sampleTGivenZT(activeTopics, doc, wordPos, alphaTheta, alphaF, textCorpus, t
             unnormalizedTopicProbs.append(0.0)
         else:
             numerator1 = alphaTheta + numTopicAssignmentsToWordTypeCount
-            numerator2 = math.gamma(alphaF + numTopicAssignmentsToWordTypeCount)
+            try:
+                numerator2 = math.gamma(alphaF + numTopicAssignmentsToWordTypeCount)
+            except:
+                print "not good"
+                GibbsCounts.getNumTopicAssignmentsToWordTypeExcl(\
+                                    wordType=wordType, topic=iteratingTopic, tLArr=tLArr,
+                                    textCorpus=textCorpus, 
+                                    numTopicAssignmentsToWordTypeDict=numTopicAssignmentsToWordType,
+                                    excludeDocWordPositions=[(doc,wordPos)] + excludeDocWordPositions)
             denominator = sum([alphaF + GibbsCounts.getNumTopicAssignmentsToWordTypeExcl(\
                                         wordType=getRthActiveWordTypeInTopic(r, iteratingTopic, zMat),
                                         topic=iteratingTopic, tLArr=tLArr,
