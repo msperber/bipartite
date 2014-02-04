@@ -24,6 +24,8 @@ class HyperParameters(object):
         self.tau = tau
         self.aGamma = aGamma
         self.bGamma = bGamma
+    def __str__(self):
+        return ', '.join("%s: %s" % item for item in vars(self).items())
 
 
 

@@ -216,7 +216,7 @@ def createNewTopics(iteratingWordType, textCorpus, samplingVariables, hyperParam
     
     newTopics = samplingVariables.createNewTopics(numNewTopics)
     samplingVariables.counts.numActiveTopicsForWordType[iteratingWordType] += numNewTopics
-    print "nr new topics", numNewTopics
+#    print "nr new topics", numNewTopics
     wordFreqs = textCorpus.getVocabFrequencies()
     totalNumWords = textCorpus.getTotalNumWords()
 
@@ -456,8 +456,52 @@ def computeLMarginDistribution(textCorpus, samplingVariables, zMat, uMat, active
         sumGammaU = 0.0
         for iteratingWordType in range(textCorpus.getVocabSize()):
             sumGammaU += samplingVariables.gammas[iteratingWordType] * uMat[iteratingWordType][iteratingTopic]
-        h(theta_iteratingTopic) * kappaFunction(getNumWordTypesActivatedInTopic(iteratingTopic, zMat),
+        factor3 *= kappaFunction(getNumWordTypesActivatedInTopic(iteratingTopic, zMat),
                                                  sumGammaU,
                                                  hyperParams.alpha, hyperParams.sigma, 
                                                  hyperParams.tau)
     return factor1 * factor2 * factor3
+
+def computeLogLikelihoodTWZ(activeTopics, textCorpus, tLArr, zMat, 
+                alphaTheta, alphaF, numWordTypesActivatedInTopics, numTopicOccurencesInDoc):
+    
+    factor3 = 1.0
+    activeTopics = activeTopics
+    for iteratingDoc in range(len(textCorpus)):
+        subNumerator1 = math.gamma(len(activeTopics) * alphaTheta)
+        subDenominator1 = math.gamma(alphaTheta) ** len(activeTopics)
+        subNumerator2 = 1.0
+        for iteratingTopic in activeTopics:
+            subNumerator2 *= math.gamma(alphaTheta + 
+                                     numTopicOccurencesInDoc.get((iteratingDoc,iteratingTopic),0))
+        subDenominator2 = math.gamma(len(activeTopics)*alphaTheta \
+                           + sum([numTopicOccurencesInDoc.get((iteratingDoc, iteratingTopic), 0) \
+                                          for iteratingTopic in activeTopics]))
+        factor3 *= subNumerator1 / subDenominator1 * subNumerator2 / subDenominator2
+    
+    factor4 = 1.0
+    for iteratingTopic in activeTopics:
+        if numWordTypesActivatedInTopics.get(iteratingTopic, 0) == 0:
+            continue
+        subNumerator1 = math.gamma(
+                                numWordTypesActivatedInTopics.get(iteratingTopic, 0)*alphaF)
+        subDenominator1 = math.gamma(alphaF) ** numWordTypesActivatedInTopics.get(iteratingTopic,
+                                                                                     0)
+        subNumerator2 = 1.0
+        for r in range(numWordTypesActivatedInTopics.get(iteratingTopic, 0)):
+            subNumerator2 *= math.gamma(alphaF + 
+                                      getNumTopicAssignmentsToWordType(
+                                                    topic=iteratingTopic, 
+                                                    wordType=getRthActiveWordTypeInTopic(
+                                                                            r=r, 
+                                                                            topic=iteratingTopic,
+                                                                            zMat=zMat), 
+                                                    tLArr=tLArr,
+                                                    textCorpus=textCorpus))
+        subDenominator2 = math.gamma(
+                            numWordTypesActivatedInTopics.get(iteratingTopic, 0)*alphaF \
+                               + sum([getRthActiveWordTypeInTopic(r, iteratingTopic, zMat) \
+                                      for r in range(numWordTypesActivatedInTopics.get(iteratingTopic,
+                                                                                     0))]))
+        factor4 *= subNumerator1 / subDenominator1 * subNumerator2 / subDenominator2
+    return math.log(factor3 * factor4)
