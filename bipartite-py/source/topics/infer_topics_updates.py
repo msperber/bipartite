@@ -216,7 +216,7 @@ def createNewTopics(iteratingWordType, textCorpus, samplingVariables, hyperParam
     
     newTopics = samplingVariables.createNewTopics(numNewTopics)
     samplingVariables.counts.numActiveTopicsForWordType[iteratingWordType] += numNewTopics
-#    print "nr new topics", numNewTopics
+    print "nr new topics", numNewTopics
     wordFreqs = textCorpus.getVocabFrequencies()
     totalNumWords = textCorpus.getTotalNumWords()
 
@@ -332,17 +332,9 @@ def sampleTGivenZT(activeTopics, doc, wordPos, alphaTheta, alphaF, textCorpus, t
         if utility.approx_equal(zMat[wordType,iteratingTopic], 0):
             unnormalizedTopicProbs.append(0.0)
         else:
-            numerator1 = alphaTheta + numTopicAssignmentsToWordTypeCount
-            try:
-                numerator2 = math.gamma(alphaF + numTopicAssignmentsToWordTypeCount)
-            except:
-                print "not good"
-                GibbsCounts.getNumTopicAssignmentsToWordTypeExcl(\
-                                    wordType=wordType, topic=iteratingTopic, tLArr=tLArr,
-                                    textCorpus=textCorpus, 
-                                    numTopicAssignmentsToWordTypeDict=numTopicAssignmentsToWordType,
-                                    excludeDocWordPositions=[(doc,wordPos)] + excludeDocWordPositions)
-            denominator = sum([alphaF + GibbsCounts.getNumTopicAssignmentsToWordTypeExcl(\
+            numerator1 = alphaTheta/len(activeTopics) + numTopicAssignmentsToWordTypeCount
+            numerator2 = math.gamma(alphaF/numWordTypesActivatedInTopics[iteratingTopic] + numTopicAssignmentsToWordTypeCount)
+            denominator = sum([alphaF/numWordTypesActivatedInTopics[iteratingTopic] + GibbsCounts.getNumTopicAssignmentsToWordTypeExcl(\
                                         wordType=getRthActiveWordTypeInTopic(r, iteratingTopic, zMat),
                                         topic=iteratingTopic, tLArr=tLArr,
                                         textCorpus=textCorpus, 
@@ -368,12 +360,12 @@ def computeRelativeProbabilityForTZ(activeTopics, textCorpus, wordType, topic, t
     activeTopics = activeTopics
     for iteratingDoc in range(len(textCorpus)):
         subNumerator1 = math.gamma(len(activeTopics) * alphaTheta)
-        subDenominator1 = math.gamma(alphaTheta) ** len(activeTopics)
+        subDenominator1 = math.gamma(alphaTheta/len(activeTopics)) ** len(activeTopics)
         subNumerator2 = 1.0
         for iteratingTopic in activeTopics:
-            subNumerator2 *= math.gamma(alphaTheta + 
+            subNumerator2 *= math.gamma(alphaTheta/len(activeTopics) + 
                                      numTopicOccurencesInDoc.get((iteratingDoc,iteratingTopic),0))
-        subDenominator2 = math.gamma(len(activeTopics)*alphaTheta \
+        subDenominator2 = math.gamma(len(activeTopics)*alphaTheta/len(activeTopics) \
                            + sum([numTopicOccurencesInDoc.get((iteratingDoc, iteratingTopic), 0) \
                                           for iteratingTopic in activeTopics]))
         factor3 *= subNumerator1 / subDenominator1 * subNumerator2 / subDenominator2
@@ -383,12 +375,12 @@ def computeRelativeProbabilityForTZ(activeTopics, textCorpus, wordType, topic, t
         if numWordTypesActivatedInTopics.get(iteratingTopic, 0) == 0:
             continue
         subNumerator1 = math.gamma(
-                                numWordTypesActivatedInTopics.get(iteratingTopic, 0)*alphaF)
-        subDenominator1 = math.gamma(alphaF) ** numWordTypesActivatedInTopics.get(iteratingTopic,
+                                numWordTypesActivatedInTopics.get(iteratingTopic, 0)*alphaF/numWordTypesActivatedInTopics[iteratingTopic])
+        subDenominator1 = math.gamma(alphaF/numWordTypesActivatedInTopics[iteratingTopic]) ** numWordTypesActivatedInTopics.get(iteratingTopic,
                                                                                      0)
         subNumerator2 = 1.0
         for r in range(numWordTypesActivatedInTopics.get(iteratingTopic, 0)):
-            subNumerator2 *= math.gamma(alphaF + 
+            subNumerator2 *= math.gamma(alphaF/numWordTypesActivatedInTopics[iteratingTopic] + 
                                       getNumTopicAssignmentsToWordType(
                                                     topic=iteratingTopic, 
                                                     wordType=getRthActiveWordTypeInTopic(
@@ -398,7 +390,7 @@ def computeRelativeProbabilityForTZ(activeTopics, textCorpus, wordType, topic, t
                                                     tLArr=tLArr,
                                                     textCorpus=textCorpus))
         subDenominator2 = math.gamma(
-                            numWordTypesActivatedInTopics.get(iteratingTopic, 0)*alphaF \
+                            numWordTypesActivatedInTopics.get(iteratingTopic, 0)*alphaF/numWordTypesActivatedInTopics[iteratingTopic] \
                                + sum([getRthActiveWordTypeInTopic(r, iteratingTopic, zMat) \
                                       for r in range(numWordTypesActivatedInTopics.get(iteratingTopic,
                                                                                      0))]))
@@ -421,22 +413,32 @@ def sampleTruncatedNumNewTopics(activeTopics, textCorpus, tLArr, alphaTheta, wor
     
     unnormalizedProbs = []
     for kiPlus in range(cutoff):
-        factor1 = 1.0
+        kPlusKPlus = len(activeTopics) + kiPlus
+        
+        mainFactor1 = 1.0
+        
         for iteratingDoc in range(len(textCorpus)):
-            numerator = math.gamma((len(activeTopics)+kiPlus) * alphaTheta)
+            factor1 = 1.0 / (math.gamma(alphaTheta/kPlusKPlus) ** len(activeTopics))
+    
+            numerator1 = math.gamma(alphaTheta)
+            
+            numerator2 = 1.0
+            
             for j in activeTopics:
-                numerator *= math.gamma(alphaTheta + \
+                numerator2 *= math.gamma(alphaTheta/kPlusKPlus + \
                                       numTopicOccurencesInDoc.get((iteratingDoc, j),0))
-            denominator = math.gamma(len(textCorpus[iteratingDoc]) + \
-                                   (len(activeTopics)+ kiPlus) * alphaTheta )
-            factor1 *= numerator / denominator
+                
+            denominator = math.gamma(len(textCorpus[iteratingDoc]) + alphaTheta )
+            
+            mainFactor1 *= factor1 * numerator1 * numerator2 / denominator
+            
         lamPoisson = expr.psiTildeFunction(t=gammas[wordType], 
                                     b=sum(gammas)-gammas[wordType],
                                     alpha=alpha,
                                     sigma=sigma,
                                     tau=tau)
-        factor2 = lamPoisson**kiPlus * math.exp(-lamPoisson) / math.factorial(kiPlus)
-        unnormalizedProbs.append(factor1 * factor2)
+        mainFactor2 = lamPoisson**kiPlus * math.exp(-lamPoisson) / math.factorial(kiPlus)
+        unnormalizedProbs.append(mainFactor1 * mainFactor2)
     normalizer = sum(unnormalizedProbs)
     normalizedProbs = [p / normalizer for p in unnormalizedProbs]
     return np.nonzero(np.random.multinomial(1, normalizedProbs))[0][0]
@@ -468,13 +470,13 @@ def computeLogLikelihoodTWZ(activeTopics, textCorpus, tLArr, zMat,
     factor3 = 1.0
     activeTopics = activeTopics
     for iteratingDoc in range(len(textCorpus)):
-        subNumerator1 = math.gamma(len(activeTopics) * alphaTheta)
-        subDenominator1 = math.gamma(alphaTheta) ** len(activeTopics)
+        subNumerator1 = math.gamma(len(activeTopics) * alphaTheta/len(activeTopics))
+        subDenominator1 = math.gamma(alphaTheta/len(activeTopics)) ** len(activeTopics)
         subNumerator2 = 1.0
         for iteratingTopic in activeTopics:
-            subNumerator2 *= math.gamma(alphaTheta + 
+            subNumerator2 *= math.gamma(alphaTheta/len(activeTopics) + 
                                      numTopicOccurencesInDoc.get((iteratingDoc,iteratingTopic),0))
-        subDenominator2 = math.gamma(len(activeTopics)*alphaTheta \
+        subDenominator2 = math.gamma(len(activeTopics)*alphaTheta/len(activeTopics) \
                            + sum([numTopicOccurencesInDoc.get((iteratingDoc, iteratingTopic), 0) \
                                           for iteratingTopic in activeTopics]))
         factor3 *= subNumerator1 / subDenominator1 * subNumerator2 / subDenominator2
@@ -484,12 +486,12 @@ def computeLogLikelihoodTWZ(activeTopics, textCorpus, tLArr, zMat,
         if numWordTypesActivatedInTopics.get(iteratingTopic, 0) == 0:
             continue
         subNumerator1 = math.gamma(
-                                numWordTypesActivatedInTopics.get(iteratingTopic, 0)*alphaF)
-        subDenominator1 = math.gamma(alphaF) ** numWordTypesActivatedInTopics.get(iteratingTopic,
+                                numWordTypesActivatedInTopics.get(iteratingTopic, 0)*alphaF/numWordTypesActivatedInTopics[iteratingTopic])
+        subDenominator1 = math.gamma(alphaF/numWordTypesActivatedInTopics[iteratingTopic]) ** numWordTypesActivatedInTopics.get(iteratingTopic,
                                                                                      0)
         subNumerator2 = 1.0
         for r in range(numWordTypesActivatedInTopics.get(iteratingTopic, 0)):
-            subNumerator2 *= math.gamma(alphaF + 
+            subNumerator2 *= math.gamma(alphaF/numWordTypesActivatedInTopics[iteratingTopic] + 
                                       getNumTopicAssignmentsToWordType(
                                                     topic=iteratingTopic, 
                                                     wordType=getRthActiveWordTypeInTopic(
@@ -499,9 +501,13 @@ def computeLogLikelihoodTWZ(activeTopics, textCorpus, tLArr, zMat,
                                                     tLArr=tLArr,
                                                     textCorpus=textCorpus))
         subDenominator2 = math.gamma(
-                            numWordTypesActivatedInTopics.get(iteratingTopic, 0)*alphaF \
+                            numWordTypesActivatedInTopics.get(iteratingTopic, 0)*alphaF/numWordTypesActivatedInTopics[iteratingTopic] \
                                + sum([getRthActiveWordTypeInTopic(r, iteratingTopic, zMat) \
                                       for r in range(numWordTypesActivatedInTopics.get(iteratingTopic,
                                                                                      0))]))
         factor4 *= subNumerator1 / subDenominator1 * subNumerator2 / subDenominator2
+    try:
+        math.log(factor3 * factor4)
+    except:
+        print "wtf?"
     return math.log(factor3 * factor4)
