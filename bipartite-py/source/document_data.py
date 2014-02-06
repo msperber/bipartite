@@ -52,7 +52,7 @@ class DocumentCorpus(list):
         return frequencies
     def getTotalNumWords(self):
         return sum([len(doc) for doc in self])
-    def split(self, ratio):
+    def split(self, ratio=0.5):
         """
         splits the corpus vertically into two: each new corpus will have the same
         list of documents as before, but words in each document will be split randomly
