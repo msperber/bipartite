@@ -7,6 +7,7 @@ Created on Dec 1, 2013
 import string
 import re
 import operator
+import random
 
 alnum = set(string.letters + string.digits)
 
@@ -31,7 +32,7 @@ class DocumentCorpus(list):
         self.extend(documents)
         self.vocab = vocab
         if vocab is not None:
-            assert max([max(doc) for doc in documents if len(doc)>0]) + 1 <= len(vocab)
+            assert max([0] + [max(doc) for doc in documents if len(doc)>0]) + 1 <= len(vocab)
     def getVocabList(self):
         if self.vocab is None:
             raise Exception("no vocab was specified")
@@ -51,14 +52,71 @@ class DocumentCorpus(list):
         return frequencies
     def getTotalNumWords(self):
         return sum([len(doc) for doc in self])
-    def computeSplitCorpus(self, ratio):
+    def split(self, ratio):
         """
         splits the corpus vertically into two: each new corpus will have the same
         list of documents as before, but words in each document will be split randomly
-        between both topics, according to the given ratio   
+        between both topics, according to the given ratio. it is guaranteed that both
+        new corpora will have the same vocabulary. words with frequency 1 will be
+        discarded
         """
-        # TODO: implement
-        raise NotImplementedError()
+        if(ratio<=0.0 or ratio>=1.0):
+            raise ValueError()
+        # mark which words should be removed from vocab, and create new vocab mapping
+        frequences = self.getVocabFrequencies()
+        discardList = [i for i in range(len(frequences)) if frequences[i]<=1]
+        vocabRemapping = range(self.getVocabSize())
+        for i in discardList: vocabRemapping[i] = None
+        prevRemapping = -1
+        for i in range(len(vocabRemapping)):
+            if vocabRemapping[i] is not None:
+                vocabRemapping[i] = prevRemapping + 1
+                prevRemapping += 1
+        newVocab = None
+        if self.vocab is not None:
+            newVocab = []
+            for i in range(len(vocabRemapping)):
+                if vocabRemapping[i] is not None:
+                    assert vocabRemapping[i] == len(newVocab)
+                    newVocab.append(self.vocab[i])
+        
+        # mark first and second occurence of each words
+        firstSecondOccurences = {}
+        for iteratingDocPos in range(len(self)):
+            for iteratingWordPos in range(len(self[iteratingDocPos])):
+                curWordType = self[iteratingDocPos][iteratingWordPos]
+                if curWordType in discardList:
+                    continue
+                if curWordType in firstSecondOccurences:
+                    if len(firstSecondOccurences[curWordType])==1:
+                        firstSecondOccurences[curWordType].append((iteratingDocPos,iteratingWordPos))
+                else:
+                    firstSecondOccurences[curWordType] = [(iteratingDocPos,iteratingWordPos)]
+        
+        # distribute words
+        corpus1 = DocumentCorpus([], newVocab)
+        corpus2 = DocumentCorpus([], newVocab)
+        for iteratingDocPos in range(len(self)):
+            corpus1NewDoc, corpus2NewDoc = [], []
+            for iteratingWordPos in range(len(self[iteratingDocPos])):
+                curWordType = self[iteratingDocPos][iteratingWordPos]
+                if curWordType in discardList:
+                    continue
+                if curWordType in firstSecondOccurences:
+                    if (iteratingDocPos,iteratingWordPos) == firstSecondOccurences[curWordType][0]:
+                        corpus1NewDoc.append(vocabRemapping[curWordType])
+                        continue
+                    elif (iteratingDocPos,iteratingWordPos) == firstSecondOccurences[curWordType][1]:
+                        corpus2NewDoc.append(vocabRemapping[curWordType])
+                        continue
+                if random.random()<ratio:
+                    corpus1NewDoc.append(vocabRemapping[curWordType])
+                else:
+                    corpus2NewDoc.append(vocabRemapping[curWordType])
+            corpus1.append(Document(wordIndexList=corpus1NewDoc))
+            corpus2.append(Document(wordIndexList=corpus2NewDoc))
+        return corpus1, corpus2
+                
     @staticmethod
     def loadFromDatFile(datFile, vocabFile=None):
         """

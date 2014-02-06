@@ -1,7 +1,7 @@
 '''
 Created on Dec 1, 2013
 
-@author: matthias
+@author: Matthias Sperber
 '''
 
 from nose.tools import assert_equal, assert_raises, assert_list_equal
@@ -223,3 +223,17 @@ def test_DocumentCorpus_initializeByHand_wordCounts_Vocab():
     assert len(textCorpus[0])==2
     assert len(textCorpus[1])==3
     
+def test_DocumentCorpus_computeSplitCorpus_lowercase():
+    corpus = DocumentCorpus.loadFromCorpusFile("test_document_data_files/sample.corpus", lowercase=True)
+    # words with freq >= 2: and, of, time, in, the
+    corpus1, corpus2 = corpus.split(0.5)
+    assert len(corpus1.getVocabList()) == 5
+    assert_list_equal(corpus1.getVocabList(), corpus2.getVocabList())
+    for corp in [corpus1, corpus2]:
+        for wordType in range(len(corp.getVocabList())):
+            wordFound = False
+            for doc in corp:
+                for word in doc:
+                    if word==wordType:
+                        wordFound = True
+            assert wordFound
