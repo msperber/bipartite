@@ -44,12 +44,27 @@ def sample_alpha(samplingVariables,hyperParameters, a=0.01, b=0.01): # francois 
         #alpha = np.random.gamma(a+K, sigma/( (sum_gamma + tau)^sigma - tau^sigma ) )
 
 # according to improper prior
-def sample_sigma(samplingVariables,hyperParameters, n_MH = 1,rw_st = .05):
+def sample_sigma(textCorpus, samplingVariables,hyperParameters, n_MH = 1,rw_st = .05):
     sigma=hyperParameters.sigma
     for i in range(n_MH):
         sigma_new = logistic(logit(sigma) + rw_st*np.random.normal())
-        lograte = infer_topics_updates.computeLMarginDistribution(samplingVariables,hyperParameters)+ \
-        - infer_topics_updates.computeLMarginDistribution(samplingVariables,hyperParameters)
+        # one of these should be sigma_new?
+        lograte = infer_topics_updates.computeLMarginDistribution(textCorpus=textCorpus, 
+                                                  gammas=samplingVariables.gammas,
+                                                  zMat=samplingVariables.zMat,
+                                                  uMat=samplingVariables.uMat,
+                                                  activeTopics=samplingVariables.getActiveTopics(),
+                                                  alpha=hyperParameters.alpha, 
+                                                  sigma=hyperParameters.sigma,
+                                                  tau=hyperParameters.tau) \
+            - infer_topics_updates.computeLMarginDistribution(textCorpus=textCorpus, 
+                                                  gammas=samplingVariables.gammas,
+                                                  zMat=samplingVariables.zMat,
+                                                  uMat=samplingVariables.uMat,
+                                                  activeTopics=samplingVariables.getActiveTopics(),
+                                                  alpha=hyperParameters.alpha, 
+                                                  sigma=hyperParameters.sigma,
+                                                  tau=hyperParameters.tau)
         if np.random.rand()<math.exp(lograte):
             hyperParameters.sigma = sigma_new
 
@@ -63,14 +78,28 @@ def logit(p):
 def logistic(x):
     return 1/(1+math.exp(-x))
 
-def sample_tau(samplingVariables,hyperParameters, n_MH = 1,rw_st = .05):
+def sample_tau(textCorpus, samplingVariables,hyperParameters, n_MH = 1,rw_st = .05):
 
 # according to improper prior
     tau = hyperParameters.tau
-    for i in range(n_MH):
+    for _ in range(n_MH):
         tau_new = tau * math.exp(rw_st*np.random.normal())
-        lograte = infer_topics_updates.computeLMarginDistribution(samplingVariables,hyperParameters)+ \
-            - infer_topics_updates.computeLMarginDistribution(samplingVariables,hyperParameters)
-        if random.rand<math.exp(lograte):
+        lograte = infer_topics_updates.computeLMarginDistribution(textCorpus=textCorpus, 
+                                                  gammas=samplingVariables.gammas,
+                                                  zMat=samplingVariables.zMat,
+                                                  uMat=samplingVariables.uMat,
+                                                  activeTopics=samplingVariables.getActiveTopics(),
+                                                  alpha=hyperParameters.alpha, 
+                                                  sigma=hyperParameters.sigma,
+                                                  tau=hyperParameters.tau)+ \
+            - infer_topics_updates.computeLMarginDistribution(textCorpus=textCorpus, 
+                                                  gammas=samplingVariables.gammas,
+                                                  zMat=samplingVariables.zMat,
+                                                  uMat=samplingVariables.uMat,
+                                                  activeTopics=samplingVariables.getActiveTopics(),
+                                                  alpha=hyperParameters.alpha, 
+                                                  sigma=hyperParameters.sigma,
+                                                  tau=hyperParameters.tau)
+        if random.random()<math.exp(lograte):
             hyperParameters.tau = tau_new
     

@@ -22,7 +22,7 @@ from infer_topics_hyperparam import *
 
 
 def inferTopicsCollapsedGibbs(textCorpus, hyperParameters, numIterations, numInitialTopics=10,
-                              verbose=True):
+                              updateHyperparameters=False, verbose=True):
     
     # initialize variables
     if verbose:
@@ -47,9 +47,10 @@ def inferTopicsCollapsedGibbs(textCorpus, hyperParameters, numIterations, numIni
         updateGammas(textCorpus, samplingVariables, hyperParameters)
         
         #update Hyperparameters
-#        sample_alpha(samplingVariables, hyperParameters)
-#        sample_sigma(samplingVariables, hyperParameters)
-#        sample_tau(samplingVariables, hyperParameters)
+        if updateHyperparameters:
+            sample_alpha(samplingVariables, hyperParameters)
+            sample_sigma(textCorpus, samplingVariables, hyperParameters)
+            sample_tau(textCorpus, samplingVariables, hyperParameters)
 
         # bugcheck:
         samplingVariables.counts.assertConsistency(textCorpus, samplingVariables)
