@@ -13,13 +13,19 @@ from numpy.ma.testutils import assert_almost_equal
 from nose.tools.nontrivial import nottest
 from django.db.backends.dummy.base import ignore
 from source.topics.infer_topics_hyperparam import HyperParameters
+from matplotlib import test
 
 class TopicsTestCase (unittest.TestCase):
     
-    doc1 = Document(wordIndexList = [0,1,2,4])
-    doc2 = Document(wordIndexList = [0,1,3,5])
-    doc3 = Document(wordIndexList = [0,2,3,6])
-    textCorpus1=DocumentCorpus(documents=[doc1,doc2,doc3])
+    doc1a = Document(wordIndexList = [0,1,2,4])
+    doc2a = Document(wordIndexList = [0,1,3,5])
+    doc3a = Document(wordIndexList = [0,2,3,6])
+    textCorpus1=DocumentCorpus(documents=[doc1a,doc2a,doc3a])
+
+    doc1b = Document(wordIndexList = [1,2,4])
+    doc2b = Document(wordIndexList = [1,3,5])
+    doc3b = Document(wordIndexList = [0,3,6])
+    testCorpus=DocumentCorpus(documents=[doc1b,doc2b,doc3b])
     
     def seedRandomGeneratorsDeterministically(self):
         random.seed(13)
@@ -188,6 +194,7 @@ class TopicsTestCase (unittest.TestCase):
         hyperParameters = HyperParameters(alpha=5.0, sigma=0.5, tau=1.0, alphaTheta=1.0, 
                                           alphaF=1.0, aGamma=1.0, bGamma=1.0)
         sv = inferTopicsCollapsedGibbs(self.textCorpus1, hyperParameters, numIterations=100, 
-                                       numInitialTopics=1)
+                                       numInitialTopics=1, verbose=True,
+                                       estimatePerplexityForSplitCorpus=self.testCorpus)
         print "final t matrix: ", sv.tLArr
         assert False

@@ -14,30 +14,31 @@ import copy
 from infer_topics_updates import *
 from infer_topics_state import *
 from infer_topics_hyperparam import *
+from perplexity import *
 
 
 ########################
 ### MAIN ALGORITHM #####
 ########################
 
+def conditionalPrint(str, condition):
+    if condition: print str
 
 def inferTopicsCollapsedGibbs(textCorpus, hyperParameters, numIterations, numInitialTopics=10,
-                              updateHyperparameters=False, verbose=True):
+                              updateHyperparameters=False, verbose=True, 
+                              estimatePerplexityForSplitCorpus=None):
     
     # initialize variables
-    if verbose:
-        print "initializing sampler.."
+    conditionalPrint("initializing sampler..", verbose)
     samplingVariables = GibbsSamplingVariables(textCorpus=textCorpus, nTopics = numInitialTopics)
     samplingVariables.initWithFullTopicsAndGammasFromFrequencies(textCorpus, numInitialTopics)
+    if estimatePerplexityForSplitCorpus is not None:
+        perplexityWordAvg = {}
     if verbose:
         print "done."
     
     for iteration in range(numIterations):
-        if verbose:
-            print "Gibbs sampling iteration:", iteration
-#        print "gammas:", samplingVariables.gammas
-#        print "w's:", samplingVariables.wArr
-#        print "u's:", samplingVariables.uMat
+        conditionalPrint("Gibbs sampling iteration: " + str(iteration), verbose)
 
         # actual updates:
         updateUs(textCorpus=textCorpus, samplingVariables=samplingVariables)
@@ -67,6 +68,17 @@ def inferTopicsCollapsedGibbs(textCorpus, hyperParameters, numIterations, numIni
                 alphaF=hyperParameters.alphaF, 
                 numWordTypesActivatedInTopics=samplingVariables.counts.numWordTypesActivatedInTopic,
                 numTopicOccurencesInDoc=samplingVariables.counts.numTopicOccurencesInDoc)
+            
+        if estimatePerplexityForSplitCorpus is not None and iteration>=0.1*numIterations:
+            updatePerplexityWordAvg(perplexityWordAvg=perplexityWordAvg,
+                                    iteration=iteration - 0.1*numIterations,
+                                    samplingVariables=samplingVariables,
+                                    hyperParameters=hyperParameters,
+                                    splitCorpus=estimatePerplexityForSplitCorpus)
+    
+    if estimatePerplexityForSplitCorpus is not None:
+        print "estimated perplexity:", computeTotalPerplexityFromWordAvg(perplexityWordAvg)
+    
     return samplingVariables
         
 
