@@ -20,6 +20,8 @@ __date__   = "Feb 4, 2014"
 import docopt
 import sys
 import operator
+import random
+import numpy.random
 
 import source.topics.infer_topics as infer_topics
 import source.document_data as document_data
@@ -38,6 +40,9 @@ def main(argv=None):
     ###########################
     ## MAIN PROGRAM ###########
     ###########################
+    
+    random.seed(13)
+    numpy.random.seed(13)
     
     print "LOADING CORPUS", corpusFileName
     print "loading limited # docs:", maxNumDocs
@@ -60,7 +65,9 @@ def main(argv=None):
                             removeStopWords=removeStopWords, 
                             maxVocabSize=maxVocabSize, 
                             minNumTokens=minNumTokens)
-    print "done"
+    print "done:"
+    print "loaded", len(textCorpus), "documents", "with a total of", textCorpus.getTotalNumWords(), "words"
+    print "vocab size:", textCorpus.getVocabSize()
     print ""
     
     hyperParams = HyperParameters(alpha=5.0, sigma=0.0, tau=1.0, alphaTheta=1.0, 

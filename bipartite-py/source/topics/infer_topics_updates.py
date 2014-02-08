@@ -506,8 +506,5 @@ def computeLogLikelihoodTWZ(activeTopics, textCorpus, tLArr, zMat,
                                       for r in range(numWordTypesActivatedInTopics.get(iteratingTopic,
                                                                                      0))]))
         factor4 *= subNumerator1 / subDenominator1 * subNumerator2 / subDenominator2
-    try:
-        math.log(factor3 * factor4)
-    except:
-        print "wtf?"
+    math.log(factor3 * factor4)
     return math.log(factor3 * factor4)
