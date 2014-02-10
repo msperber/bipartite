@@ -12,9 +12,11 @@ import source.expressions as expr
 import random
 import copy
 from source.exptiltedstable import *
+from scipy.special import gammaln
 
 from infer_topics_state import *
 from source.expressions import psiTildeFunction, kappaFunction, psiFunction
+from numpy.ma.testutils import assert_almost_equal
 
 ########################
 ### UPDATES ############
@@ -43,7 +45,7 @@ def updateZs(textCorpus, samplingVariables, hyperParameters):
         for iteratingTopic in samplingVariables.getActiveTopics():
             # skip the case where only topic j is active for word i: we need at
             # least one topic in which each word is activated
-            if topicExclusivelyActivatedForWord(wordType=iteratingWordType,
+            if isOnlyActivatedTopicForWordType(wordType=iteratingWordType,
                                                 topic=iteratingTopic, 
                                                 samplingVariables=samplingVariables):
                 continue
@@ -53,6 +55,7 @@ def updateZs(textCorpus, samplingVariables, hyperParameters):
                 break
             
             # core events take place here:
+            samplingVariables.releaseDeadTopics()
             proposeAndAcceptOrReject(iteratingWordType=iteratingWordType,
                                      iteratingTopic=iteratingTopic,
                                      samplingVariables=samplingVariables, 
@@ -69,7 +72,7 @@ def updateZs(textCorpus, samplingVariables, hyperParameters):
                         samplingVariables=samplingVariables,
                         hyperParameters=hyperParameters)
 
-def topicExclusivelyActivatedForWord(wordType, topic, samplingVariables):
+def isOnlyActivatedTopicForWordType(wordType, topic, samplingVariables):
     return getNumActiveTopicsForWordType(wordType, 
                                  samplingVariables.zMat, 
                                  samplingVariables.getActiveTopics()) == 1 \
@@ -148,20 +151,23 @@ def proposeAndAcceptOrReject(iteratingWordType, iteratingTopic, samplingVariable
                             samplingVariables.tLArr[iteratingDoc][iteratingWordPos]),0) - 1
 
     # compute relative probabilities
-    
-    prob1 = computeRelativeProbabilityForTZ(
-                    activeTopics=samplingVariables.getActiveTopics(),
-                    textCorpus=textCorpus, 
-                    wordType=iteratingWordType, 
-                    topic=iteratingTopic, 
-                    tLArr=tTilde, 
-                    zMat=zTilde,
-                    gammas=samplingVariables.gammas, 
-                    wArr=samplingVariables.wArr, 
-                    alphaTheta=hyperParameters.alphaTheta, 
-                    alphaF=hyperParameters.alphaF,
-                    numWordTypesActivatedInTopics=numWordTypesActivatedInTopics,
-                    numTopicOccurencesInDoc=numTopicOccurencesInDocTilde)
+    activeTopicsTilde = list(samplingVariables.getActiveTopics())
+    if numWordTypesActivatedInTopics[iteratingTopic] == 0:
+        activeTopicsTilde.remove(iteratingTopic)
+    logprob1 = computeRelativeLogProbabilityForTZ(
+                        activeTopics=activeTopicsTilde,
+                        textCorpus=textCorpus, 
+                        wordType=iteratingWordType, 
+                        topic=iteratingTopic, 
+                        tLArr=tTilde, 
+                        zMat=zTilde,
+                        gammas=samplingVariables.gammas, 
+                        wArr=samplingVariables.wArr, 
+                        alphaTheta=hyperParameters.alphaTheta, 
+                        alphaF=hyperParameters.alphaF,
+                        numWordTypesActivatedInTopics=numWordTypesActivatedInTopics,
+                        numTopicOccurencesInDoc=numTopicOccurencesInDocTilde)
+
     # change back to the original state
     if zTilde[iteratingWordType, iteratingTopic]==1:
         numWordTypesActivatedInTopics[iteratingTopic] =\
@@ -169,7 +175,7 @@ def proposeAndAcceptOrReject(iteratingWordType, iteratingTopic, samplingVariable
     else: 
         numWordTypesActivatedInTopics[iteratingTopic] =\
                 numWordTypesActivatedInTopics.get(iteratingTopic,0) + 1
-    prob2 = computeRelativeProbabilityForTZ(
+    logprob2 = computeRelativeLogProbabilityForTZ(
                     activeTopics=samplingVariables.getActiveTopics(),
                     textCorpus=textCorpus, 
                     wordType=iteratingWordType, 
@@ -182,7 +188,12 @@ def proposeAndAcceptOrReject(iteratingWordType, iteratingTopic, samplingVariable
                     alphaF=hyperParameters.alphaF,
                     numWordTypesActivatedInTopics=numWordTypesActivatedInTopics,
                     numTopicOccurencesInDoc=samplingVariables.counts.numTopicOccurencesInDoc)
-    ratio = min(1.0, prob1/prob2)
+    if logprob1 > logprob2: 
+        ratio=1.0
+    elif logprob1 == float("-inf"):
+        ratio = 0.0
+    else:
+        ratio = math.exp(logprob1 - logprob2)
     # accept or reject
     if prob.flipCoin(ratio):
         samplingVariables.zMat = zTilde
@@ -321,7 +332,7 @@ def updateGammas(textCorpus, samplingVariables, hyperParameters):
 def sampleTGivenZT(activeTopics, doc, wordPos, alphaTheta, alphaF, textCorpus, tLArr, 
                    zMat, numWordTypesActivatedInTopics, numTopicAssignmentsToWordType,
                    excludeDocWordPositions=[]):
-    unnormalizedTopicProbs = []
+    unnormalizedTopicProbs1, unnormalizedTopicProbs2 = [], []
     wordType = textCorpus[doc][wordPos]
     for iteratingTopic in activeTopics:
         numTopicAssignmentsToWordTypeCount = GibbsCounts.getNumTopicAssignmentsToWordTypeExcl(\
@@ -330,7 +341,8 @@ def sampleTGivenZT(activeTopics, doc, wordPos, alphaTheta, alphaF, textCorpus, t
                                     numTopicAssignmentsToWordTypeDict=numTopicAssignmentsToWordType,
                                     excludeDocWordPositions=[(doc,wordPos)] + excludeDocWordPositions)
         if utility.approx_equal(zMat[wordType,iteratingTopic], 0):
-            unnormalizedTopicProbs.append(0.0)
+            unnormalizedTopicProbs1.append(0.0)
+            unnormalizedTopicProbs2.append(0.0)
         else:
             numerator1 = alphaTheta/len(activeTopics) + numTopicAssignmentsToWordTypeCount
             numerator2 = math.gamma(alphaF/numWordTypesActivatedInTopics[iteratingTopic] + numTopicAssignmentsToWordTypeCount)
@@ -341,61 +353,74 @@ def sampleTGivenZT(activeTopics, doc, wordPos, alphaTheta, alphaF, textCorpus, t
                                         numTopicAssignmentsToWordTypeDict=numTopicAssignmentsToWordType,
                                         excludeDocWordPositions=[(doc,wordPos)] + excludeDocWordPositions) \
                        for r in range(numWordTypesActivatedInTopics.get(iteratingTopic,0))])
+            propProb1 = numerator1 * numerator2 / denominator
+            summand1 = math.log(alphaTheta/len(activeTopics) + numTopicAssignmentsToWordTypeCount)
+            summand2 = gammaln(alphaF/numWordTypesActivatedInTopics[iteratingTopic] + numTopicAssignmentsToWordTypeCount)
+            summand3 = -math.log(sum([alphaF/numWordTypesActivatedInTopics[iteratingTopic] + GibbsCounts.getNumTopicAssignmentsToWordTypeExcl(\
+                                        wordType=getRthActiveWordTypeInTopic(r, iteratingTopic, zMat),
+                                        topic=iteratingTopic, tLArr=tLArr,
+                                        textCorpus=textCorpus, 
+                                        numTopicAssignmentsToWordTypeDict=numTopicAssignmentsToWordType,
+                                        excludeDocWordPositions=[(doc,wordPos)] + excludeDocWordPositions) \
+                       for r in range(numWordTypesActivatedInTopics.get(iteratingTopic,0))]))
+            propProb2 = math.exp(summand1 + summand2 + summand3)
+#            print "propProb1, propProb2", propProb1, propProb2
+            if abs(propProb1 - propProb2) > 0.001:
+                print "stop"
+            assert_almost_equal(propProb1, propProb2)
+            unnormalizedTopicProbs1.append(propProb1)
+            unnormalizedTopicProbs2.append(propProb2)
+    normalizer1 = sum(unnormalizedTopicProbs1)
+    normalizer2 = sum(unnormalizedTopicProbs2)
+    normalizedTopicProbs1 = [p / normalizer1 for p in unnormalizedTopicProbs1]
+    normalizedTopicProbs2 = [p / normalizer2 for p in unnormalizedTopicProbs2]
+    # TODO: wtf.. using logs produces virtually the same numbers, but still screws up the test result..
+#    print "normalizedTopicProbs", normalizedTopicProbs1, normalizedTopicProbs2
+    return activeTopics[np.nonzero(np.random.multinomial(1, normalizedTopicProbs1))[0][0]]
 
-            unnormalizedTopicProbs.append(numerator1 * numerator2 / denominator)
-    normalizer = sum(unnormalizedTopicProbs)
-    normalizedTopicProbs = [p / normalizer for p in unnormalizedTopicProbs]
-    return activeTopics[np.nonzero(np.random.multinomial(1, normalizedTopicProbs))[0][0]]
-
-def computeRelativeProbabilityForTZ(activeTopics, textCorpus, wordType, topic, tLArr, zMat, gammas, 
-                wArr, alphaTheta, alphaF, numWordTypesActivatedInTopics, numTopicOccurencesInDoc):
+def computeRelativeLogProbabilityForTZ(activeTopics, textCorpus, wordType, topic, tLArr, zMat, 
+                                       gammas, wArr, alphaTheta, alphaF, 
+                                       numWordTypesActivatedInTopics, numTopicOccurencesInDoc):
     if oneIfTopicAssignmentsSupported(textCorpus, tLArr, zMat)!=1:
-        return 0.0
+        return float("-inf")
     
-    factor1 = (1.0 - math.exp(-gammas[wordType]*wArr[topic]))**zMat[wordType,topic]
+    summand1 = zMat[wordType,topic] * math.log(1.0 - math.exp(-gammas[wordType]*wArr[topic]))
     
-    factor2 = math.exp(-(1-zMat[wordType,topic])*gammas[wordType]*wArr[topic])
+    summand2 = -(1-zMat[wordType,topic])*gammas[wordType]*wArr[topic]
     
-    factor3 = 1.0
-    activeTopics = activeTopics
+    summand3 = 0.0
     for iteratingDoc in range(len(textCorpus)):
-        subNumerator1 = math.gamma(len(activeTopics) * alphaTheta)
-        subDenominator1 = math.gamma(alphaTheta/len(activeTopics)) ** len(activeTopics)
-        subNumerator2 = 1.0
+        summand3 += gammaln(alphaTheta) - len(activeTopics)*gammaln(alphaTheta/len(activeTopics))
+        
+    summand4 = 0.0 
+    for iteratingDoc in range(len(textCorpus)):
         for iteratingTopic in activeTopics:
-            subNumerator2 *= math.gamma(alphaTheta/len(activeTopics) + 
-                                     numTopicOccurencesInDoc.get((iteratingDoc,iteratingTopic),0))
-        subDenominator2 = math.gamma(len(activeTopics)*alphaTheta/len(activeTopics) \
-                           + sum([numTopicOccurencesInDoc.get((iteratingDoc, iteratingTopic), 0) \
-                                          for iteratingTopic in activeTopics]))
-        factor3 *= subNumerator1 / subDenominator1 * subNumerator2 / subDenominator2
-    
-    factor4 = 1.0
+            summand4 += gammaln(alphaTheta/len(activeTopics) + \
+                                numTopicOccurencesInDoc.get((iteratingDoc, iteratingTopic), 0.0))
+            summand4 -= gammaln(alphaTheta + \
+                                numTopicOccurencesInDoc.get((iteratingDoc, iteratingTopic),0.0))
+        
+    summand5 = 0.0
     for iteratingTopic in activeTopics:
-        if numWordTypesActivatedInTopics.get(iteratingTopic, 0) == 0:
-            continue
-        subNumerator1 = math.gamma(
-                                numWordTypesActivatedInTopics.get(iteratingTopic, 0)*alphaF/numWordTypesActivatedInTopics[iteratingTopic])
-        subDenominator1 = math.gamma(alphaF/numWordTypesActivatedInTopics[iteratingTopic]) ** numWordTypesActivatedInTopics.get(iteratingTopic,
-                                                                                     0)
-        subNumerator2 = 1.0
+        summand5 += gammaln(alphaF) - numWordTypesActivatedInTopics[iteratingTopic] \
+                                * gammaln(alphaF / numWordTypesActivatedInTopics[iteratingTopic])
+
+    summand6 = 0.0
+    for iteratingTopic in activeTopics:
         for r in range(numWordTypesActivatedInTopics.get(iteratingTopic, 0)):
-            subNumerator2 *= math.gamma(alphaF/numWordTypesActivatedInTopics[iteratingTopic] + 
-                                      getNumTopicAssignmentsToWordType(
+            topicsForWord = getNumTopicAssignmentsToWordType(
                                                     topic=iteratingTopic, 
                                                     wordType=getRthActiveWordTypeInTopic(
                                                                             r=r, 
                                                                             topic=iteratingTopic,
                                                                             zMat=zMat), 
                                                     tLArr=tLArr,
-                                                    textCorpus=textCorpus))
-        subDenominator2 = math.gamma(
-                            numWordTypesActivatedInTopics.get(iteratingTopic, 0)*alphaF/numWordTypesActivatedInTopics[iteratingTopic] \
-                               + sum([getRthActiveWordTypeInTopic(r, iteratingTopic, zMat) \
-                                      for r in range(numWordTypesActivatedInTopics.get(iteratingTopic,
-                                                                                     0))]))
-        factor4 *= subNumerator1 / subDenominator1 * subNumerator2 / subDenominator2
-    return factor1 * factor2 * factor3 * factor4
+                                                    textCorpus=textCorpus)
+            summand6 += gammaln(alphaF/numWordTypesActivatedInTopics[iteratingTopic]+topicsForWord)
+            summand6 -= gammaln(1.0 + topicsForWord)
+    
+    return summand1 + summand2 + summand3 + summand4 + summand5 + summand6
+
 
 def oneIfTopicAssignmentsSupported(textCorpus, tLArr, zMat, excludeDocWordPositions=[]):
     for iteratingDoc in range(len(tLArr)):
