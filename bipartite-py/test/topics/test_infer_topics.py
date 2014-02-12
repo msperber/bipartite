@@ -193,7 +193,7 @@ class TopicsTestCase (unittest.TestCase):
         self.seedRandomGeneratorsDeterministically()
         hyperParameters = HyperParameters(alpha=5.0, sigma=0.5, tau=1.0, alphaTheta=1.0, 
                                           alphaF=1.0, aGamma=1.0, bGamma=1.0)
-        sv = inferTopicsCollapsedGibbs(self.textCorpus1, hyperParameters, numIterations=100, 
+        sv = inferTopicsCollapsedGibbs(self.textCorpus1, hyperParameters, numIterations=200, 
                                        numInitialTopics=1, verbose=True,
                                        estimatePerplexityForSplitCorpus=self.testCorpus)
         print "final t matrix: ", sv.tLArr

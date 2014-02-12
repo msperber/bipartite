@@ -212,7 +212,7 @@ def proposeAndAcceptOrReject(iteratingWordType, iteratingTopic, samplingVariable
                     numTopicAssignmentsToWordTypeDeltaTilde[i,j]
 
 def createNewTopics(iteratingWordType, textCorpus, samplingVariables, hyperParameters):
-    numNewTopics = sampleTruncatedNumNewTopics(
+    numNewTopics = sampleTruncatedNumNewTopicsLog(
                                   activeTopics=samplingVariables.getActiveTopics(),
                                   textCorpus=textCorpus, 
                                   tLArr=samplingVariables.tLArr, 
@@ -227,7 +227,7 @@ def createNewTopics(iteratingWordType, textCorpus, samplingVariables, hyperParam
     
     newTopics = samplingVariables.createNewTopics(numNewTopics)
     samplingVariables.counts.numActiveTopicsForWordType[iteratingWordType] += numNewTopics
-    print "nr new topics", numNewTopics
+#    print "nr new topics", numNewTopics
     wordFreqs = textCorpus.getVocabFrequencies()
     totalNumWords = textCorpus.getTotalNumWords()
 
@@ -344,16 +344,16 @@ def sampleTGivenZT(activeTopics, doc, wordPos, alphaTheta, alphaF, textCorpus, t
             unnormalizedTopicProbs1.append(0.0)
             unnormalizedTopicProbs2.append(0.0)
         else:
-            numerator1 = alphaTheta/len(activeTopics) + numTopicAssignmentsToWordTypeCount
-            numerator2 = math.gamma(alphaF/numWordTypesActivatedInTopics[iteratingTopic] + numTopicAssignmentsToWordTypeCount)
-            denominator = sum([alphaF/numWordTypesActivatedInTopics[iteratingTopic] + GibbsCounts.getNumTopicAssignmentsToWordTypeExcl(\
-                                        wordType=getRthActiveWordTypeInTopic(r, iteratingTopic, zMat),
-                                        topic=iteratingTopic, tLArr=tLArr,
-                                        textCorpus=textCorpus, 
-                                        numTopicAssignmentsToWordTypeDict=numTopicAssignmentsToWordType,
-                                        excludeDocWordPositions=[(doc,wordPos)] + excludeDocWordPositions) \
-                       for r in range(numWordTypesActivatedInTopics.get(iteratingTopic,0))])
-            propProb1 = numerator1 * numerator2 / denominator
+#            numerator1 = alphaTheta/len(activeTopics) + numTopicAssignmentsToWordTypeCount
+#            numerator2 = math.gamma(alphaF/numWordTypesActivatedInTopics[iteratingTopic] + numTopicAssignmentsToWordTypeCount)
+#            denominator = sum([alphaF/numWordTypesActivatedInTopics[iteratingTopic] + GibbsCounts.getNumTopicAssignmentsToWordTypeExcl(\
+#                                        wordType=getRthActiveWordTypeInTopic(r, iteratingTopic, zMat),
+#                                        topic=iteratingTopic, tLArr=tLArr,
+#                                        textCorpus=textCorpus, 
+#                                        numTopicAssignmentsToWordTypeDict=numTopicAssignmentsToWordType,
+#                                        excludeDocWordPositions=[(doc,wordPos)] + excludeDocWordPositions) \
+#                       for r in range(numWordTypesActivatedInTopics.get(iteratingTopic,0))])
+#            propProb1 = numerator1 * numerator2 / denominator
             summand1 = math.log(alphaTheta/len(activeTopics) + numTopicAssignmentsToWordTypeCount)
             summand2 = gammaln(alphaF/numWordTypesActivatedInTopics[iteratingTopic] + numTopicAssignmentsToWordTypeCount)
             summand3 = -math.log(sum([alphaF/numWordTypesActivatedInTopics[iteratingTopic] + GibbsCounts.getNumTopicAssignmentsToWordTypeExcl(\
@@ -365,18 +365,18 @@ def sampleTGivenZT(activeTopics, doc, wordPos, alphaTheta, alphaF, textCorpus, t
                        for r in range(numWordTypesActivatedInTopics.get(iteratingTopic,0))]))
             propProb2 = math.exp(summand1 + summand2 + summand3)
 #            print "propProb1, propProb2", propProb1, propProb2
-            if abs(propProb1 - propProb2) > 0.001:
-                print "stop"
-            assert_almost_equal(propProb1, propProb2)
-            unnormalizedTopicProbs1.append(propProb1)
+#            if abs(propProb1 - propProb2) > 0.001:
+#                print "stop"
+#            assert_almost_equal(propProb1, propProb2)
+#            unnormalizedTopicProbs1.append(propProb1)
             unnormalizedTopicProbs2.append(propProb2)
-    normalizer1 = sum(unnormalizedTopicProbs1)
+#    normalizer1 = sum(unnormalizedTopicProbs1)
     normalizer2 = sum(unnormalizedTopicProbs2)
-    normalizedTopicProbs1 = [p / normalizer1 for p in unnormalizedTopicProbs1]
+#    normalizedTopicProbs1 = [p / normalizer1 for p in unnormalizedTopicProbs1]
     normalizedTopicProbs2 = [p / normalizer2 for p in unnormalizedTopicProbs2]
     # TODO: wtf.. using logs produces virtually the same numbers, but still screws up the test result..
 #    print "normalizedTopicProbs", normalizedTopicProbs1, normalizedTopicProbs2
-    return activeTopics[np.nonzero(np.random.multinomial(1, normalizedTopicProbs1))[0][0]]
+    return activeTopics[np.nonzero(np.random.multinomial(1, normalizedTopicProbs2))[0][0]]
 
 def computeRelativeLogProbabilityForTZ(activeTopics, textCorpus, wordType, topic, tLArr, zMat, 
                                        gammas, wArr, alphaTheta, alphaF, 
@@ -464,6 +464,40 @@ def sampleTruncatedNumNewTopics(activeTopics, textCorpus, tLArr, alphaTheta, wor
                                     tau=tau)
         mainFactor2 = lamPoisson**kiPlus * math.exp(-lamPoisson) / math.factorial(kiPlus)
         unnormalizedProbs.append(mainFactor1 * mainFactor2)
+    normalizer = sum(unnormalizedProbs)
+    normalizedProbs = [p / normalizer for p in unnormalizedProbs]
+    return np.nonzero(np.random.multinomial(1, normalizedProbs))[0][0]
+
+def sampleTruncatedNumNewTopicsLog(activeTopics, textCorpus, tLArr, alphaTheta, wordType,
+                                gammas, alpha, sigma, tau, numTopicOccurencesInDoc, cutoff=30):
+    
+    unnormalizedProbs = []
+    k = len(activeTopics)
+    for kiPlus in range(cutoff):
+        kPlusKPlus = len(activeTopics) + kiPlus
+        
+        mainSummand = 0.0
+        
+        for iteratingDoc in range(len(textCorpus)):
+            mainSummand += -k * gammaln(alphaTheta/kPlusKPlus)
+            
+            mainSummand += gammaln(alphaTheta)
+            
+            innerSum = 0.0
+            for j in activeTopics:
+                innerSum += numTopicOccurencesInDoc.get((iteratingDoc, j),0)
+
+            mainSummand += -gammaln(innerSum + alphaTheta)
+            
+            for topic in activeTopics:
+                mainSummand += gammaln(alphaTheta/kPlusKPlus + numTopicOccurencesInDoc.get((iteratingDoc, topic),0))
+        lamPoisson = expr.psiTildeFunction(t=gammas[wordType], 
+                                    b=sum(gammas)-gammas[wordType],
+                                    alpha=alpha,
+                                    sigma=sigma,
+                                    tau=tau)
+        mainFactor2 = lamPoisson**kiPlus * math.exp(-lamPoisson) / math.factorial(kiPlus)
+        unnormalizedProbs.append(math.exp(mainSummand) * mainFactor2)
     normalizer = sum(unnormalizedProbs)
     normalizedProbs = [p / normalizer for p in unnormalizedProbs]
     return np.nonzero(np.random.multinomial(1, normalizedProbs))[0][0]
