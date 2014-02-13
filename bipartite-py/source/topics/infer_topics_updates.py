@@ -471,7 +471,7 @@ def sampleTruncatedNumNewTopics(activeTopics, textCorpus, tLArr, alphaTheta, wor
 def sampleTruncatedNumNewTopicsLog(activeTopics, textCorpus, tLArr, alphaTheta, wordType,
                                 gammas, alpha, sigma, tau, numTopicOccurencesInDoc, cutoff=30):
     
-    unnormalizedProbs = []
+    logProbs = []
     k = len(activeTopics)
     for kiPlus in range(cutoff):
         kPlusKPlus = len(activeTopics) + kiPlus
@@ -497,7 +497,10 @@ def sampleTruncatedNumNewTopicsLog(activeTopics, textCorpus, tLArr, alphaTheta, 
                                     sigma=sigma,
                                     tau=tau)
         mainFactor2 = lamPoisson**kiPlus * math.exp(-lamPoisson) / math.factorial(kiPlus)
-        unnormalizedProbs.append(math.exp(mainSummand) * mainFactor2)
+        logProbs.append(mainSummand + math.log(mainFactor2))
+    maxLog = max(logProbs)
+    for i in range(len(logProbs)): logProbs[i] -= maxLog
+    unnormalizedProbs = [math.exp(v) for v in logProbs]
     normalizer = sum(unnormalizedProbs)
     normalizedProbs = [p / normalizer for p in unnormalizedProbs]
     return np.nonzero(np.random.multinomial(1, normalizedProbs))[0][0]
