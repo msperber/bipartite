@@ -529,44 +529,40 @@ def computeLMarginDistribution(textCorpus, gammas, zMat, uMat, activeTopics, alp
 def computeLogLikelihoodTWZ(activeTopics, textCorpus, tLArr, zMat, 
                 alphaTheta, alphaF, numWordTypesActivatedInTopics, numTopicOccurencesInDoc):
     
-    factor3 = 1.0
-    activeTopics = activeTopics
-    for iteratingDoc in range(len(textCorpus)):
-        subNumerator1 = math.gamma(len(activeTopics) * alphaTheta/len(activeTopics))
-        subDenominator1 = math.gamma(alphaTheta/len(activeTopics)) ** len(activeTopics)
-        subNumerator2 = 1.0
-        for iteratingTopic in activeTopics:
-            subNumerator2 *= math.gamma(alphaTheta/len(activeTopics) + 
-                                     numTopicOccurencesInDoc.get((iteratingDoc,iteratingTopic),0))
-        subDenominator2 = math.gamma(len(activeTopics)*alphaTheta/len(activeTopics) \
-                           + sum([numTopicOccurencesInDoc.get((iteratingDoc, iteratingTopic), 0) \
-                                          for iteratingTopic in activeTopics]))
-        factor3 *= subNumerator1 / subDenominator1 * subNumerator2 / subDenominator2
+    if oneIfTopicAssignmentsSupported(textCorpus, tLArr, zMat)!=1:
+        return float("-inf")
     
-    factor4 = 1.0
+    summand3 = 0.0
+    for iteratingDoc in range(len(textCorpus)):
+        summand3 += gammaln(alphaTheta) - len(activeTopics)*gammaln(alphaTheta/len(activeTopics))
+        
+    summand4 = 0.0 
+    for iteratingDoc in range(len(textCorpus)):
+        for iteratingTopic in activeTopics:
+            summand4 += gammaln(alphaTheta/len(activeTopics) + \
+                                numTopicOccurencesInDoc.get((iteratingDoc, iteratingTopic), 0.0))
+            summand4 -= gammaln(alphaTheta + \
+                                numTopicOccurencesInDoc.get((iteratingDoc, iteratingTopic),0.0))
+        
+    summand5 = 0.0
     for iteratingTopic in activeTopics:
-        if numWordTypesActivatedInTopics.get(iteratingTopic, 0) == 0:
-            continue
-        subNumerator1 = math.gamma(
-                                numWordTypesActivatedInTopics.get(iteratingTopic, 0)*alphaF/numWordTypesActivatedInTopics[iteratingTopic])
-        subDenominator1 = math.gamma(alphaF/numWordTypesActivatedInTopics[iteratingTopic]) ** numWordTypesActivatedInTopics.get(iteratingTopic,
-                                                                                     0)
-        subNumerator2 = 1.0
+        summand5 += gammaln(alphaF) - numWordTypesActivatedInTopics[iteratingTopic] \
+                                * gammaln(alphaF / numWordTypesActivatedInTopics[iteratingTopic])
+
+    summand6 = 0.0
+    for iteratingTopic in activeTopics:
         for r in range(numWordTypesActivatedInTopics.get(iteratingTopic, 0)):
-            subNumerator2 *= math.gamma(alphaF/numWordTypesActivatedInTopics[iteratingTopic] + 
-                                      getNumTopicAssignmentsToWordType(
+            topicsForWord = getNumTopicAssignmentsToWordType(
                                                     topic=iteratingTopic, 
                                                     wordType=getRthActiveWordTypeInTopic(
                                                                             r=r, 
                                                                             topic=iteratingTopic,
                                                                             zMat=zMat), 
                                                     tLArr=tLArr,
-                                                    textCorpus=textCorpus))
-        subDenominator2 = math.gamma(
-                            numWordTypesActivatedInTopics.get(iteratingTopic, 0)*alphaF/numWordTypesActivatedInTopics[iteratingTopic] \
-                               + sum([getRthActiveWordTypeInTopic(r, iteratingTopic, zMat) \
-                                      for r in range(numWordTypesActivatedInTopics.get(iteratingTopic,
-                                                                                     0))]))
-        factor4 *= subNumerator1 / subDenominator1 * subNumerator2 / subDenominator2
-    math.log(factor3 * factor4)
-    return math.log(factor3 * factor4)
+                                                    textCorpus=textCorpus)
+            summand6 += gammaln(alphaF/numWordTypesActivatedInTopics[iteratingTopic]+topicsForWord)
+            summand6 -= gammaln(1.0 + topicsForWord)
+    
+    return summand3 + summand4 + summand5 + summand6
+
+

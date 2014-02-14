@@ -21,8 +21,8 @@ from perplexity import *
 ### MAIN ALGORITHM #####
 ########################
 
-def conditionalPrint(str, condition):
-    if condition: print str
+def conditionalPrint(string, condition):
+    if condition: print string
 
 def inferTopicsCollapsedGibbs(textCorpus, hyperParameters, numIterations, numInitialTopics=10,
                               updateHyperparameters=False, verbose=True, 

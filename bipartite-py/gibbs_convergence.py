@@ -33,7 +33,7 @@ def main(argv=None):
     maxNumDocs = None
     if '--numDocs' in arguments: maxNumDocs = int(arguments['--numDocs'])
     updateHyperParams = False
-    if '--updateHyperParams' in arguments:
+    if arguments.get('--updateHyperParams', False):
         updateHyperParams = True
     # TODO: make other parameters configurable
     
@@ -52,7 +52,7 @@ def main(argv=None):
     print "removing tokens smaller than:", minTokenLen
     removeStopWords=True
     print "removing stopwords:", removeStopWords
-    maxVocabSize=None
+    maxVocabSize=50
     print "limit vocab size:", maxVocabSize
     minNumTokens=10
     print "remove tokens with frequency <", minNumTokens
@@ -75,7 +75,7 @@ def main(argv=None):
     print "(INITIAL) HYPER PARAMETERS:", hyperParams
     print ""
     
-    numIterations=100
+    numIterations=5
     print "NUM ITERATIONS:",numIterations 
     
     numInitialTopics=10
