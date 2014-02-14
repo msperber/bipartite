@@ -190,6 +190,16 @@ def getNumTopicAssignmentsToWordType(topic, wordType, tLArr, textCorpus,
                     num += 1
     return num
 
+def getNumTopicAssignments(topic, tLArr, textCorpus, # sjv
+                                    excludeDocWordPositions=[]):
+    num = 0
+    for iteratingDoc in range(len(tLArr)):
+        for iteratingWordPos in range(len(tLArr[iteratingDoc])):
+            if topic==tLArr[iteratingDoc][iteratingWordPos]:
+                if (iteratingDoc, iteratingWordPos) not in excludeDocWordPositions:
+                    num += 1
+    return num
+
 def getNumWordTypesActivatedInTopic(topic, zMat):
     return int(np.asscalar(zMat[:,topic].sum()))
 

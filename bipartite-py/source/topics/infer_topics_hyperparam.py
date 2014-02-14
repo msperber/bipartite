@@ -12,6 +12,7 @@ import math
 import source.expressions as expr
 import random
 import copy
+from infer_topics_state import * # ?? not sure if good idea
 
 
 class HyperParameters(object):
@@ -68,6 +69,39 @@ def sample_sigma(textCorpus, samplingVariables,hyperParameters, n_MH = 1,rw_st =
         if np.random.rand()<math.exp(lograte):
             hyperParameters.sigma = sigma_new
 
+def alphaThetaLogLhood(textCorpus, samplingVariables,hyperParameters):
+    alphaTheta=hyperParameters.alphaTheta
+    activeTopics=samplingVariables.getActiveTopics()
+    
+    summand1=len(textCorpus) * math.lgamma(alphaTheta)
+    summand2=-len(textCorpus) *len(activeTopics)*math.lgamma(alphaTheta/len(activeTopics))
+    summand3=0.0
+    for iteratingDoc in range(len(textCorpus)):
+        summand3 += math.lgamma(alphaTheta+len(textCorpus[iteratingDoc]))
+    summand4=0.0
+    for iteratingDoc in range(len(textCorpus)):
+        for iteratingTopic in activeTopics:
+            summand4 += math.lgamma(alphaTheta/len(activeTopics)+getNumTopicOccurencesInDoc(iteratingTopic, iteratingDoc, samplingVariables.tLArr))
+    return summand1+summand2+summand3+summand4
+
+def alphaFLogLhood(textCorpus, samplingVariables,hyperParameters):
+    alphaF=hyperParameters.alphaF
+    activeTopics=samplingVariables.getActiveTopics()
+    
+    summand1=len(textCorpus) * math.lgamma(alphaF)
+    summand2=0.0
+    summand3=0.0
+
+    for iteratingTopic in activeTopics:
+        mj = getNumWordTypesActivatedInTopic(iteratingTopic, samplingVariables.zMat)
+        ndotdotj=getNumTopicAssignments(iteratingTopic, samplingVariables.tLArr, textCorpus) 
+        summand2+=-mj*math.lgamma(alphaF/mj)-math.lgamma(alphaF+ndotdotj)
+        for r in range(mj):            
+            ndotijrj = 0 # ??? Fix dont know how to calculate.
+            summand3=math.lgamma(alphaF/mj+ndotijrj)
+    return summand1+summand2+summand3
+
+    
 
 
 
