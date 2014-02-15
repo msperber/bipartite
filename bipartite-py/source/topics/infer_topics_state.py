@@ -120,10 +120,11 @@ class RevertableSparseDict(dict):
     * sparse: when key is unknown, value 0 will be returned 
     ** note: len() and keys() only reflect the non-revertable part, while getitem reflects the revertable part
     """ 
-    def __init__(self, *args, **kw):
+    def __init__(self, defaultReturnValue=0, *args, **kw):
         super(RevertableSparseDict,self).__init__(*args, **kw)
         self.tmpDict = {}
         self.activateRevertable=True
+        self.defaultReturnValue=defaultReturnValue
     def setRevertable(self, key, value):
         self.tmpDict[key] = value
     def addRevertable(self, key, value):
@@ -142,7 +143,7 @@ class RevertableSparseDict(dict):
             return self.tmpDict[key]
         elif key in super(RevertableSparseDict, self).keys():
             return super(RevertableSparseDict, self).__getitem__(key)
-        return 0
+        return self.defaultReturnValue
     def activateRevertableChanges(self, value=True):
         self.activateRevertable=value
     
@@ -158,6 +159,7 @@ class GibbsCounts(object):
         self.numTopicAssignmentsToWordType = RevertableSparseDict()
         self.numWordTypesActivatedInTopic = RevertableSparseDict()
         self.numActiveTopicsForWordType = RevertableSparseDict()
+        self.docWordPosListForTopicAssignments = RevertableSparseDict(defaultReturnValue=[])
         for topic in samplingVariables.getActiveTopics():
             for docId in range(len(textCorpus)):
                 self.numTopicOccurencesInDoc[docId, topic] = \
@@ -174,6 +176,13 @@ class GibbsCounts(object):
             self.numActiveTopicsForWordType[wordType] = \
                     getNumActiveTopicsForWordType(wordType=wordType, zMat=samplingVariables.zMat, 
                                           activeTopics=samplingVariables.getActiveTopics())
+        for docId in range(len(textCorpus)):
+            for wordPos in range(len(textCorpus[docId])):
+                wordType = textCorpus[docId][wordPos]
+                assignedTopic = samplingVariables.tLArr[docId][wordPos]
+                if (wordType, assignedTopic) not in self.docWordPosListForTopicAssignments:
+                    self.docWordPosListForTopicAssignments[wordType, assignedTopic] = []
+                self.docWordPosListForTopicAssignments[wordType, assignedTopic].append((docId,wordPos))
     def assertConsistency(self, textCorpus, samplingVariables):
         for topic in samplingVariables.getActiveTopics():
             for docId in range(len(textCorpus)):
@@ -243,3 +252,12 @@ def getNumActiveTopicsForWordType(wordType, zMat, activeTopics):
     for j in activeTopics:
         n += zMat[wordType, j]
     return int(n)
+
+def getDocWordPosListOfWordTypeAssignedToTopic(wordType, topic, tLArr, textCorpus):
+    LQij = []
+    for iteratingDoc in range(len(tLArr)):
+        for iteratingWordPos in range(len(tLArr[iteratingDoc])):
+            if textCorpus[iteratingDoc][iteratingWordPos]==wordType \
+                    and tLArr[iteratingDoc][iteratingWordPos]==topic:
+                LQij.append((iteratingDoc, iteratingWordPos))
+    return LQij

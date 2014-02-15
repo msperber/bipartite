@@ -233,6 +233,10 @@ class RevertableDictTestCase (unittest.TestCase):
         assert d[0] == 0
         assert d[1] == 1
         assert d[2] == 0
+
+    def test_default(self):
+        d = RevertableSparseDict(defaultReturnValue=4)
+        assert d[0] == 4 
     
     def test_makePermanent(self):
         d = RevertableSparseDict()

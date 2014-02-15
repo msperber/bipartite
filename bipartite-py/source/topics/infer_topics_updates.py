@@ -81,12 +81,12 @@ def isOnlyActivatedTopicForWordType(wordType, topic, samplingVariables):
         
 def proposeAndAcceptOrReject(iteratingWordType, iteratingTopic, samplingVariables, 
                              textCorpus, hyperParameters):
-    LQij = [] # TODO: cache these
-    for iteratingDoc in range(len(textCorpus)):
-        for iteratingWordPos in range(len(textCorpus[iteratingDoc])):
-            if textCorpus[iteratingDoc][iteratingWordPos]==iteratingWordType \
-                    and samplingVariables.tLArr[iteratingDoc][iteratingWordPos]==iteratingTopic:
-                LQij.append((iteratingDoc, iteratingWordPos))
+    LQij = samplingVariables.counts.docWordPosListForTopicAssignments[iteratingWordType, iteratingTopic]
+#    for iteratingDoc in range(len(textCorpus)):
+#        for iteratingWordPos in range(len(textCorpus[iteratingDoc])):
+#            if textCorpus[iteratingDoc][iteratingWordPos]==iteratingWordType \
+#                    and samplingVariables.tLArr[iteratingDoc][iteratingWordPos]==iteratingTopic:
+#                LQij.append((iteratingDoc, iteratingWordPos))
 
     # switch z_ij between 0 and 1
     zTilde = samplingVariables.zMat.copy()
@@ -120,7 +120,7 @@ def proposeAndAcceptOrReject(iteratingWordType, iteratingTopic, samplingVariable
                     numWordTypesActivatedInTopics=numWordTypesActivatedInTopics,
                     numTopicAssignmentsToWordType=\
                                 samplingVariables.counts.numTopicAssignmentsToWordType)
-        # update numTopicAssignmentsToWordType counts
+        # update counts
         samplingVariables.counts.numTopicAssignmentsToWordType.addRevertable(
                 (textCorpus[iteratingDoc][iteratingWordPos],
                  tTilde[iteratingDoc][iteratingWordPos]),
@@ -130,7 +130,6 @@ def proposeAndAcceptOrReject(iteratingWordType, iteratingTopic, samplingVariable
                  samplingVariables.tLArr[iteratingDoc][iteratingWordPos]),
                 -1)
 
-        # update numTopicOccurencesInDoc counts
         samplingVariables.counts.numTopicOccurencesInDoc.addRevertable((iteratingDoc,
                                                 tTilde[iteratingDoc][iteratingWordPos]), + 1)
         samplingVariables.counts.numTopicOccurencesInDoc.addRevertable((iteratingDoc,
@@ -184,9 +183,15 @@ def proposeAndAcceptOrReject(iteratingWordType, iteratingTopic, samplingVariable
         ratio = math.exp(logprob1 - logprob2)
     # accept or reject
     if prob.flipCoin(ratio):
-        
+        # accept
         samplingVariables.zMat = zTilde
         samplingVariables.tLArr = tTilde
+        samplingVariables.counts.docWordPosListForTopicAssignments[iteratingWordType, iteratingTopic] = []
+        for (doc,wordPos) in LQij:
+            newTopic = tTilde[doc][wordPos]
+            if (iteratingWordType, newTopic) not in samplingVariables.counts.docWordPosListForTopicAssignments:
+                samplingVariables.counts.docWordPosListForTopicAssignments[iteratingWordType, newTopic] = []
+            samplingVariables.counts.docWordPosListForTopicAssignments[iteratingWordType, newTopic].append((doc, wordPos))
         numWordTypesActivatedInTopics.makePermanent()
         samplingVariables.counts.numTopicOccurencesInDoc.makePermanent()
         samplingVariables.counts.numTopicAssignmentsToWordType.makePermanent()
@@ -195,6 +200,7 @@ def proposeAndAcceptOrReject(iteratingWordType, iteratingTopic, samplingVariable
         else:
             samplingVariables.counts.numActiveTopicsForWordType[iteratingWordType] -= 1
     else:
+        # reject
         # revert changes to samplingVariables.counts.numTopicAssignmentsToWordType:
         numWordTypesActivatedInTopics.revert()
         samplingVariables.counts.numTopicOccurencesInDoc.revert()
@@ -247,6 +253,7 @@ def createNewTopics(iteratingWordType, textCorpus, samplingVariables, hyperParam
 def updateTs(textCorpus, samplingVariables, hyperParameters):
     for iteratingDocument in range(len(textCorpus)):
         for iteratingWordPos in range(len(textCorpus[iteratingDocument])):
+            currentWordType = textCorpus[iteratingDocument][iteratingWordPos]
             prevTopic = samplingVariables.tLArr[iteratingDocument][iteratingWordPos]
             newTopic = \
                     sampleTGivenZT(activeTopics=samplingVariables.getActiveTopics(),
@@ -261,17 +268,21 @@ def updateTs(textCorpus, samplingVariables, hyperParameters):
                             numTopicAssignmentsToWordType=samplingVariables.counts.numTopicAssignmentsToWordType, 
                             excludeDocWordPositions=[(iteratingDocument, iteratingWordPos)])
             samplingVariables.tLArr[iteratingDocument][iteratingWordPos] = newTopic
+            samplingVariables.counts.docWordPosListForTopicAssignments[currentWordType,prevTopic].remove((iteratingDocument,iteratingWordPos))
+            if (currentWordType,newTopic) not in samplingVariables.counts.docWordPosListForTopicAssignments:
+                samplingVariables.counts.docWordPosListForTopicAssignments[currentWordType,newTopic] = []
+            samplingVariables.counts.docWordPosListForTopicAssignments[currentWordType,newTopic].append((iteratingDocument,iteratingWordPos))
             samplingVariables.counts.numTopicAssignmentsToWordType[ \
-                                    textCorpus[iteratingDocument][iteratingWordPos],
+                                    currentWordType,
                                     prevTopic] \
                             = samplingVariables.counts.numTopicAssignmentsToWordType.get(( \
-                                    textCorpus[iteratingDocument][iteratingWordPos],
+                                    currentWordType,
                                     prevTopic),0) - 1
             samplingVariables.counts.numTopicAssignmentsToWordType[ \
-                                textCorpus[iteratingDocument][iteratingWordPos],
+                                currentWordType,
                                 newTopic] \
                         = samplingVariables.counts.numTopicAssignmentsToWordType.get(( \
-                                textCorpus[iteratingDocument][iteratingWordPos],
+                                currentWordType,
                                 newTopic), 0) + 1
             samplingVariables.counts.numTopicOccurencesInDoc[iteratingDocument,prevTopic] = \
                     samplingVariables.counts.numTopicOccurencesInDoc.get((iteratingDocument,prevTopic),0) \
