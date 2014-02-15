@@ -65,8 +65,9 @@ def main(argv=None):
                             removeStopWords=removeStopWords, 
                             maxVocabSize=maxVocabSize, 
                             minNumTokens=minNumTokens)
+    trainCorpus, testCorpus = textCorpus.split()
     print "done:"
-    print "loaded", len(textCorpus), "documents", "with a total of", textCorpus.getTotalNumWords(), "words"
+    print "loaded", len(textCorpus), "documents", "with a total of", textCorpus.getTotalNumWords(), "words (using half for testing)"
     print "vocab size:", textCorpus.getVocabSize()
     print ""
     
@@ -75,18 +76,19 @@ def main(argv=None):
     print "(INITIAL) HYPER PARAMETERS:", hyperParams
     print ""
     
-    numIterations=100
+    numIterations=20
     print "NUM ITERATIONS:",numIterations 
     
     numInitialTopics=10
     print "NUM INITIAL TOPICS:", numInitialTopics
     
-    infer_topics.inferTopicsCollapsedGibbs(textCorpus=textCorpus, 
+    infer_topics.inferTopicsCollapsedGibbs(textCorpus=trainCorpus, 
                                            hyperParameters=hyperParams, 
                                            numIterations=numIterations, 
                                            numInitialTopics=numInitialTopics,
                                            updateHyperparameters=updateHyperParams,
-                                           verbose=True)
+                                           verbose=True,
+                                           estimatePerplexityForSplitCorpus=testCorpus)
     
 
 
