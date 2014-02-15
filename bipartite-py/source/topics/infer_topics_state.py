@@ -113,7 +113,39 @@ class GibbsSamplingVariables(object):
     def removeTopic(self, topic):
         self.deadTopics.append(topic)
         self.activeTopics.remove(topic)
-
+        
+class RevertableSparseDict(dict):
+    """
+    * revertable: can make temporary changes and revert these changes later
+    * sparse: when key is unknown, value 0 will be returned 
+    ** note: len() and keys() only reflect the non-revertable part, while getitem reflects the revertable part
+    """ 
+    def __init__(self, *args, **kw):
+        super(RevertableSparseDict,self).__init__(*args, **kw)
+        self.tmpDict = {}
+        self.activateRevertable=True
+    def setRevertable(self, key, value):
+        self.tmpDict[key] = value
+    def addRevertable(self, key, value):
+        if key in self.tmpDict:
+            self.tmpDict[key] += value
+        else:
+            self.tmpDict[key] = self.__getitem__(key) + value
+    def revert(self):
+        self.tmpDict.clear()
+    def makePermanent(self):
+        for k in self.tmpDict:
+            self.__setitem__(k, self.tmpDict[k])
+        self.tmpDict.clear()
+    def __getitem__(self, key):
+        if self.activateRevertable and key in self.tmpDict:
+            return self.tmpDict[key]
+        elif key in super(RevertableSparseDict, self).keys():
+            return super(RevertableSparseDict, self).__getitem__(key)
+        return 0
+    def activateRevertableChanges(self, value=True):
+        self.activateRevertable=value
+    
 class GibbsCounts(object):
     """
     Counts are implemented as pair-indexed dictionaries (for now).
@@ -122,10 +154,10 @@ class GibbsCounts(object):
     All updates are made from the outside, the class itself gives no guarantees as for consistency.
     """
     def __init__(self, textCorpus, samplingVariables):
-        self.numTopicOccurencesInDoc = {}
-        self.numTopicAssignmentsToWordType = {}
-        self.numWordTypesActivatedInTopic = {}
-        self.numActiveTopicsForWordType = {}
+        self.numTopicOccurencesInDoc = RevertableSparseDict()
+        self.numTopicAssignmentsToWordType = RevertableSparseDict()
+        self.numWordTypesActivatedInTopic = RevertableSparseDict()
+        self.numActiveTopicsForWordType = RevertableSparseDict()
         for topic in samplingVariables.getActiveTopics():
             for docId in range(len(textCorpus)):
                 self.numTopicOccurencesInDoc[docId, topic] = \

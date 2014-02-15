@@ -81,7 +81,7 @@ def isOnlyActivatedTopicForWordType(wordType, topic, samplingVariables):
         
 def proposeAndAcceptOrReject(iteratingWordType, iteratingTopic, samplingVariables, 
                              textCorpus, hyperParameters):
-    LQij = []
+    LQij = [] # TODO: cache these
     for iteratingDoc in range(len(textCorpus)):
         for iteratingWordPos in range(len(textCorpus[iteratingDoc])):
             if textCorpus[iteratingDoc][iteratingWordPos]==iteratingWordType \
@@ -98,15 +98,13 @@ def proposeAndAcceptOrReject(iteratingWordType, iteratingTopic, samplingVariable
     # single step), so must be changed back immediately after
     numWordTypesActivatedInTopics = samplingVariables.counts.numWordTypesActivatedInTopic
     if zTilde[iteratingWordType, iteratingTopic]==1:
-        numWordTypesActivatedInTopics[iteratingTopic] =\
-                numWordTypesActivatedInTopics.get(iteratingTopic,0) + 1
+        numWordTypesActivatedInTopics.setRevertable(iteratingTopic,
+                                                    numWordTypesActivatedInTopics[iteratingTopic]+1)
     else: 
-        numWordTypesActivatedInTopics[iteratingTopic] =\
-                numWordTypesActivatedInTopics.get(iteratingTopic,0) - 1
-    # store delta counts so we can revert the changes if the proposal is rejected
-    numTopicAssignmentsToWordTypeDeltaTilde = {}
-    numTopicOccurencesInDocTilde = \
-            copy.deepcopy(samplingVariables.counts.numTopicOccurencesInDoc)
+        numWordTypesActivatedInTopics.setRevertable(iteratingTopic,
+                                                    numWordTypesActivatedInTopics[iteratingTopic]-1)
+    numWordTypesActivatedInTopics.activateRevertableChanges()
+    
     for r in range(len(LQij)):
         iteratingDoc, iteratingWordPos = LQij[r]
         tTilde[iteratingDoc][iteratingWordPos] = sampleTGivenZT(
@@ -123,34 +121,25 @@ def proposeAndAcceptOrReject(iteratingWordType, iteratingTopic, samplingVariable
                     numTopicAssignmentsToWordType=\
                                 samplingVariables.counts.numTopicAssignmentsToWordType)
         # update numTopicAssignmentsToWordType counts
-        samplingVariables.counts.numTopicAssignmentsToWordType[textCorpus[iteratingDoc]\
-                            [iteratingWordPos],tTilde[iteratingDoc][iteratingWordPos]] \
-                = samplingVariables.counts.numTopicAssignmentsToWordType.get( \
-                    (textCorpus[iteratingDoc][iteratingWordPos],
-                     tTilde[iteratingDoc][iteratingWordPos]), 0) + 1
-        samplingVariables.counts.numTopicAssignmentsToWordType[textCorpus[iteratingDoc]\
-            [iteratingWordPos],samplingVariables.tLArr[iteratingDoc][iteratingWordPos]] \
-                -= 1
-        numTopicAssignmentsToWordTypeDeltaTilde[textCorpus[iteratingDoc]\
-                            [iteratingWordPos],tTilde[iteratingDoc][iteratingWordPos]] \
-            = numTopicAssignmentsToWordTypeDeltaTilde.get((textCorpus[iteratingDoc]\
-                        [iteratingWordPos],tTilde[iteratingDoc][iteratingWordPos]), 0) + 1
-        numTopicAssignmentsToWordTypeDeltaTilde[textCorpus[iteratingDoc]\
-                            [iteratingWordPos],samplingVariables.tLArr[iteratingDoc][iteratingWordPos]] \
-            = numTopicAssignmentsToWordTypeDeltaTilde.get((textCorpus[iteratingDoc]\
-        [iteratingWordPos],samplingVariables.tLArr[iteratingDoc][iteratingWordPos]), 0) - 1
+        samplingVariables.counts.numTopicAssignmentsToWordType.addRevertable(
+                (textCorpus[iteratingDoc][iteratingWordPos],
+                 tTilde[iteratingDoc][iteratingWordPos]),
+                +1)
+        samplingVariables.counts.numTopicAssignmentsToWordType.addRevertable(
+                (textCorpus[iteratingDoc][iteratingWordPos],
+                 samplingVariables.tLArr[iteratingDoc][iteratingWordPos]),
+                -1)
 
         # update numTopicOccurencesInDoc counts
-        numTopicOccurencesInDocTilde[iteratingDoc,
-                                                tTilde[iteratingDoc][iteratingWordPos]] = \
-                numTopicOccurencesInDocTilde.get((iteratingDoc,
-                                            tTilde[iteratingDoc][iteratingWordPos]),0) + 1
-        numTopicOccurencesInDocTilde[iteratingDoc,
-                                samplingVariables.tLArr[iteratingDoc][iteratingWordPos]] = \
-                numTopicOccurencesInDocTilde.get((iteratingDoc,
-                            samplingVariables.tLArr[iteratingDoc][iteratingWordPos]),0) - 1
-
+        samplingVariables.counts.numTopicOccurencesInDoc.addRevertable((iteratingDoc,
+                                                tTilde[iteratingDoc][iteratingWordPos]), + 1)
+        samplingVariables.counts.numTopicOccurencesInDoc.addRevertable((iteratingDoc,
+                                samplingVariables.tLArr[iteratingDoc][iteratingWordPos]), - 1)
+    samplingVariables.counts.numTopicOccurencesInDoc.activateRevertableChanges()
+    samplingVariables.counts.numTopicAssignmentsToWordType.activateRevertableChanges()
+    
     # compute relative probabilities
+    # TODO: make removal revertable instead of allocating a new list for active topics
     activeTopicsTilde = list(samplingVariables.getActiveTopics())
     if numWordTypesActivatedInTopics[iteratingTopic] == 0:
         activeTopicsTilde.remove(iteratingTopic)
@@ -166,15 +155,13 @@ def proposeAndAcceptOrReject(iteratingWordType, iteratingTopic, samplingVariable
                         alphaTheta=hyperParameters.alphaTheta, 
                         alphaF=hyperParameters.alphaF,
                         numWordTypesActivatedInTopics=numWordTypesActivatedInTopics,
-                        numTopicOccurencesInDoc=numTopicOccurencesInDocTilde)
+                        numTopicOccurencesInDoc=samplingVariables.counts.numTopicOccurencesInDoc,
+                        numTopicAssignmentsToWordType=samplingVariables.counts.numTopicAssignmentsToWordType)
 
     # change back to the original state
-    if zTilde[iteratingWordType, iteratingTopic]==1:
-        numWordTypesActivatedInTopics[iteratingTopic] =\
-                numWordTypesActivatedInTopics.get(iteratingTopic,0) - 1
-    else: 
-        numWordTypesActivatedInTopics[iteratingTopic] =\
-                numWordTypesActivatedInTopics.get(iteratingTopic,0) + 1
+    numWordTypesActivatedInTopics.activateRevertableChanges(False)
+    samplingVariables.counts.numTopicOccurencesInDoc.activateRevertableChanges(False)
+    samplingVariables.counts.numTopicAssignmentsToWordType.activateRevertableChanges(False)
     logprob2 = computeRelativeLogProbabilityForTZ(
                     activeTopics=samplingVariables.getActiveTopics(),
                     textCorpus=textCorpus, 
@@ -187,7 +174,8 @@ def proposeAndAcceptOrReject(iteratingWordType, iteratingTopic, samplingVariable
                     alphaTheta=hyperParameters.alphaTheta, 
                     alphaF=hyperParameters.alphaF,
                     numWordTypesActivatedInTopics=numWordTypesActivatedInTopics,
-                    numTopicOccurencesInDoc=samplingVariables.counts.numTopicOccurencesInDoc)
+                    numTopicOccurencesInDoc=samplingVariables.counts.numTopicOccurencesInDoc,
+                    numTopicAssignmentsToWordType=samplingVariables.counts.numTopicAssignmentsToWordType)
     if logprob1 > logprob2: 
         ratio=1.0
     elif logprob1 == float("-inf"):
@@ -196,20 +184,21 @@ def proposeAndAcceptOrReject(iteratingWordType, iteratingTopic, samplingVariable
         ratio = math.exp(logprob1 - logprob2)
     # accept or reject
     if prob.flipCoin(ratio):
+        
         samplingVariables.zMat = zTilde
         samplingVariables.tLArr = tTilde
-        samplingVariables.counts.numTopicOccurencesInDoc = numTopicOccurencesInDocTilde
+        numWordTypesActivatedInTopics.makePermanent()
+        samplingVariables.counts.numTopicOccurencesInDoc.makePermanent()
+        samplingVariables.counts.numTopicAssignmentsToWordType.makePermanent()
         if samplingVariables.zMat[iteratingWordType, iteratingTopic]==1:
             samplingVariables.counts.numActiveTopicsForWordType[iteratingWordType] += 1
-            samplingVariables.counts.numWordTypesActivatedInTopic[iteratingTopic] += 1
         else:
             samplingVariables.counts.numActiveTopicsForWordType[iteratingWordType] -= 1
-            samplingVariables.counts.numWordTypesActivatedInTopic[iteratingTopic] -= 1
     else:
         # revert changes to samplingVariables.counts.numTopicAssignmentsToWordType:
-        for (i,j) in numTopicAssignmentsToWordTypeDeltaTilde:
-            samplingVariables.counts.numTopicAssignmentsToWordType[i,j] -= \
-                    numTopicAssignmentsToWordTypeDeltaTilde[i,j]
+        numWordTypesActivatedInTopics.revert()
+        samplingVariables.counts.numTopicOccurencesInDoc.revert()
+        samplingVariables.counts.numTopicAssignmentsToWordType.revert()
 
 def createNewTopics(iteratingWordType, textCorpus, samplingVariables, hyperParameters):
     numNewTopics = sampleTruncatedNumNewTopicsLog(
@@ -380,7 +369,8 @@ def sampleTGivenZT(activeTopics, doc, wordPos, alphaTheta, alphaF, textCorpus, t
 
 def computeRelativeLogProbabilityForTZ(activeTopics, textCorpus, wordType, topic, tLArr, zMat, 
                                        gammas, wArr, alphaTheta, alphaF, 
-                                       numWordTypesActivatedInTopics, numTopicOccurencesInDoc):
+                                       numWordTypesActivatedInTopics, numTopicOccurencesInDoc,
+                                       numTopicAssignmentsToWordType):
     if oneIfTopicAssignmentsSupported(textCorpus, tLArr, zMat)!=1:
         return float("-inf")
     
@@ -407,15 +397,20 @@ def computeRelativeLogProbabilityForTZ(activeTopics, textCorpus, wordType, topic
 
     summand6 = 0.0
     for iteratingTopic in activeTopics:
-        for r in range(numWordTypesActivatedInTopics.get(iteratingTopic, 0)):
-            topicsForWord = getNumTopicAssignmentsToWordType(
-                                                    topic=iteratingTopic, 
-                                                    wordType=getRthActiveWordTypeInTopic(
+        for r in range(numWordTypesActivatedInTopics[iteratingTopic]):
+            topicsForWord = numTopicAssignmentsToWordType[(iteratingTopic, 
+                                                               getRthActiveWordTypeInTopic(
                                                                             r=r, 
                                                                             topic=iteratingTopic,
-                                                                            zMat=zMat), 
-                                                    tLArr=tLArr,
-                                                    textCorpus=textCorpus)
+                                                                            zMat=zMat))]
+#            getNumTopicAssignmentsToWordType(
+#                                                    topic=iteratingTopic, 
+#                                                    wordType=getRthActiveWordTypeInTopic(
+#                                                                            r=r, 
+#                                                                            topic=iteratingTopic,
+#                                                                            zMat=zMat), 
+#                                                    tLArr=tLArr,
+#                                                    textCorpus=textCorpus)
             summand6 += gammaln(alphaF/numWordTypesActivatedInTopics[iteratingTopic]+topicsForWord)
             summand6 -= gammaln(1.0 + topicsForWord)
     

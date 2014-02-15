@@ -11,11 +11,10 @@ from source.document_data import *
 from source.utility import approx_equal
 from numpy.ma.testutils import assert_almost_equal
 from nose.tools.nontrivial import nottest
-from django.db.backends.dummy.base import ignore
 from source.topics.infer_topics_hyperparam import HyperParameters
 from matplotlib import test
-
-class TopicsTestCase (unittest.TestCase):
+from source.topics.infer_topics_state import RevertableSparseDict
+class TopicStateTestCase (unittest.TestCase):
     
     doc1a = Document(wordIndexList = [0,1,2,4])
     doc2a = Document(wordIndexList = [0,1,3,5])
@@ -189,12 +188,83 @@ class TopicsTestCase (unittest.TestCase):
         sVars.zMat[self.textCorpus1[0][0], sVars.tLArr[0][0]] = 0
         assert oneIfTopicAssignmentsSupported(self.textCorpus1, sVars.tLArr, sVars.zMat)==0
     
-    def test_inferTopicsCollapsedGibbs_runsWithoutException(self):
-        self.seedRandomGeneratorsDeterministically()
-        hyperParameters = HyperParameters(alpha=5.0, sigma=0.5, tau=1.0, alphaTheta=1.0, 
-                                          alphaF=1.0, aGamma=1.0, bGamma=1.0)
-        sv = inferTopicsCollapsedGibbs(self.textCorpus1, hyperParameters, numIterations=200, 
-                                       numInitialTopics=1, verbose=True,
-                                       estimatePerplexityForSplitCorpus=self.testCorpus)
-        print "final t matrix: ", sv.tLArr
-        assert False
+class RevertableDictTestCase (unittest.TestCase):
+    def test_dictFunctions(self):
+        d = RevertableSparseDict()
+        d[3] = 4
+        d[4,5] = 2
+        d["a"] = 1
+        assert d[3] == 4
+        assert d[4,5] == 2
+        assert d["a"] == 1
+    
+    def test_sparseDict(self):
+        d = RevertableSparseDict()
+        assert d[4] == 0
+        d[4,4] = 0
+        d[3] = 3
+        d[2] = 2
+        d[2] = 0
+    
+    def test_revert(self):
+        d = RevertableSparseDict()
+        d[0] = 0
+        d[1] = 1
+        d.setRevertable(1, 0)
+        d.setRevertable(2,1)
+        assert d[0] == 0
+        assert d[1] == 0
+        assert d[2] == 1
+        d.revert()
+        assert d[0] == 0
+        assert d[1] == 1
+        assert d[2] == 0
+
+    def test_revert_add(self):
+        d = RevertableSparseDict()
+        d[0] = 0
+        d[1] = 1
+        d.addRevertable(1, -1)
+        d.addRevertable(2,1)
+        assert d[0] == 0
+        assert d[1] == 0
+        assert d[2] == 1
+        d.revert()
+        assert d[0] == 0
+        assert d[1] == 1
+        assert d[2] == 0
+    
+    def test_makePermanent(self):
+        d = RevertableSparseDict()
+        d[0] = 0
+        d[1] = 1
+        d.setRevertable(1, 0)
+        d.setRevertable(2,1)
+        assert d[0] == 0
+        assert d[1] == 0
+        assert d[2] == 1
+        d.makePermanent()
+        d.revert()
+        assert d[0] == 0
+        assert d[1] == 0
+        assert d[2] == 1
+         
+    def test_deactivate(self):
+        d = RevertableSparseDict()
+        d[0] = 0
+        d[1] = 1
+        d.setRevertable(1, 0)
+        d.setRevertable(2,1)
+        assert d[0] == 0
+        assert d[1] == 0
+        assert d[2] == 1
+        d.activateRevertableChanges(False)
+        assert d[0] == 0
+        assert d[1] == 1
+        assert d[2] == 0
+        d.activateRevertableChanges(True)
+        assert d[0] == 0
+        assert d[1] == 0
+        assert d[2] == 1
+
+        
