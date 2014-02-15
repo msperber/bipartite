@@ -75,7 +75,7 @@ def main(argv=None):
     print "(INITIAL) HYPER PARAMETERS:", hyperParams
     print ""
     
-    numIterations=5
+    numIterations=100
     print "NUM ITERATIONS:",numIterations 
     
     numInitialTopics=10
