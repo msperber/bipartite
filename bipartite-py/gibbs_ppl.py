@@ -4,12 +4,17 @@
 Description
 
 Usage:
-  gibbs_convergence.py [options] <corpusFile>
+  gibbs_ppl.py [options] <corpusFile>
 
 Options:
     --numDocs n     limit number of documents to be loaded
     --updateHyperParams
-    
+    --pplEachIteration
+    --alpha x       alpha Hyperparameter [default: 5.0]
+    --tau x         tau Hyperparameter [default: 1.0]
+    --sigma x       sigma Hyperparameter [default: 0.0]
+    --alphaF x      alphaF alphaF [default: 1.0]
+    --alphaTheta x  alphaTheta alphaF [default: 1.0]
     (as always: -h for help)
 """
 from source.prob import HyperParameters
@@ -33,9 +38,13 @@ def main(argv=None):
     corpusFileName = arguments['<corpusFile>']
     maxNumDocs = None
     if '--numDocs' in arguments: maxNumDocs = int(arguments['--numDocs'])
-    updateHyperParams = False
-    if arguments.get('--updateHyperParams', False):
-        updateHyperParams = True
+    updateHyperParams = arguments.get('--updateHyperParams', False)
+    pplEachIteration = arguments.get('--pplEachIteration', False)
+    alpha = float(arguments.get('--alpha'))
+    sigma = float(arguments.get('--sigma'))
+    tau = float(arguments.get('--tau'))
+    alphaF = float(arguments.get('--alphaF'))
+    alphaTheta = float(arguments.get('--alphaTheta'))
     # TODO: make other parameters configurable
     
     ###########################
@@ -53,7 +62,7 @@ def main(argv=None):
     print "removing tokens smaller than:", minTokenLen
     removeStopWords=True
     print "removing stopwords:", removeStopWords
-    maxVocabSize=50
+    maxVocabSize=1000
     print "limit vocab size:", maxVocabSize
     minNumTokens=10
     print "remove tokens with frequency <", minNumTokens
@@ -66,17 +75,18 @@ def main(argv=None):
                             removeStopWords=removeStopWords, 
                             maxVocabSize=maxVocabSize, 
                             minNumTokens=minNumTokens)
+    trainCorpus, testCorpus = textCorpus.split()
     print "done:"
-    print "loaded", len(textCorpus), "documents", "with a total of", textCorpus.getTotalNumWords(), "words"
+    print "loaded", len(textCorpus), "documents", "with a total of", textCorpus.getTotalNumWords(), "words (using half for testing)"
     print "vocab size:", textCorpus.getVocabSize()
     print ""
     
-    hyperParams = HyperParameters(alpha=5.0, sigma=0.0, tau=1.0, alphaTheta=1.0, 
-                                          alphaF=1.0, aGamma=1.0, bGamma=1.0)
+    hyperParams = HyperParameters(alpha=alpha, sigma=sigma, tau=tau, alphaTheta=alphaTheta, 
+                                          alphaF=alphaF, aGamma=1.0, bGamma=1.0)
     print "(INITIAL) HYPER PARAMETERS:", hyperParams
     print ""
     
-    numIterations=20
+    numIterations=100
     print "NUM ITERATIONS:",numIterations 
     
     numInitialTopics=10
@@ -87,7 +97,9 @@ def main(argv=None):
                                            numIterations=numIterations, 
                                            numInitialTopics=numInitialTopics,
                                            updateHyperparameters=updateHyperParams,
-                                           verbose=True)
+                                           verbose=True,
+                                           estimatePerplexityForSplitCorpus=testCorpus,
+                                           pplEachIteration=pplEachIteration)
     
 
 

@@ -26,7 +26,7 @@ def conditionalPrint(string, condition):
 
 def inferTopicsCollapsedGibbs(textCorpus, hyperParameters, numIterations, numInitialTopics=10,
                               updateHyperparameters=False, verbose=True, 
-                              estimatePerplexityForSplitCorpus=None):
+                              estimatePerplexityForSplitCorpus=None,pplEachIteration=False):
     
     # initialize variables
     conditionalPrint("initializing sampler..", verbose)
@@ -75,6 +75,9 @@ def inferTopicsCollapsedGibbs(textCorpus, hyperParameters, numIterations, numIni
                                     samplingVariables=samplingVariables,
                                     hyperParameters=hyperParameters,
                                     splitCorpus=estimatePerplexityForSplitCorpus)
+            if pplEachIteration:
+                print "estimated perplexity:", computeTotalPerplexityFromWordAvg(perplexityWordAvg)
+
     
     if estimatePerplexityForSplitCorpus is not None:
         print "estimated perplexity:", computeTotalPerplexityFromWordAvg(perplexityWordAvg)
