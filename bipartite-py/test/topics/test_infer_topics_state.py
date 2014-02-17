@@ -271,4 +271,65 @@ class RevertableDictTestCase (unittest.TestCase):
         assert d[1] == 0
         assert d[2] == 1
 
+class RevertableListTestCase (unittest.TestCase):
+    def test_listFunctions(self):
+        l = RevertableList()
+        l.append(4)
+        l.append(2)
+        l.append(1)
+        assert l[0] == 4
+        assert l[1] == 2
+        assert l[2] == 1
+        assert_raises(IndexError, l.__getitem__, 4)
+    
+    def test_revert(self):
+        l = RevertableList()
+        l.append(0)
+        l.append(1)
+        l.setRevertable(1, 0)
+        l.setRevertable(0, 0)
+        assert l[0] == 0
+        assert l[1] == 0
+        l.revert()
+        assert l[0] == 0
+        assert l[1] == 1
+
+    def test_revert_add(self):
+        l = RevertableList()
+        l.append(0)
+        l.append(1)
+        l.addRevertable(1, -1)
+        l.addRevertable(0, 1)
+        assert l[0] == 1
+        assert l[1] == 0
+        l.revert()
+        assert l[0] == 0
+        assert l[1] == 1
+    
+    def test_makePermanent(self):
+        l = RevertableList()
+        l.append(0)
+        l.append(1)
+        l.setRevertable(0, 1)
+        l.setRevertable(1, 0)
+        l.makePermanent()
+        l.revert()
+        assert l[0] == 1
+        assert l[1] == 0
+         
+    def test_deactivate(self):
+        l = RevertableList()
+        l.append(0)
+        l.append(1)
+        l.setRevertable(0, 1)
+        l.setRevertable(1, 0)
+        assert l[0] == 1
+        assert l[1] == 0
+        l.activateRevertableChanges(False)
+        assert l[0] == 0
+        assert l[1] == 1
+        l.activateRevertableChanges(True)
+        assert l[0] == 1
+        assert l[1] == 0
+
         

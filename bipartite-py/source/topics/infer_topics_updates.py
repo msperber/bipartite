@@ -89,15 +89,17 @@ def proposeAndAcceptOrReject(iteratingWordType, iteratingTopic, samplingVariable
 #                LQij.append((iteratingDoc, iteratingWordPos))
 
     # switch z_ij between 0 and 1
-    zTilde = samplingVariables.zMat.copy()
-    zTilde[iteratingWordType, iteratingTopic] = 1 - zTilde[iteratingWordType, iteratingTopic]
-    tTilde = copy.deepcopy(samplingVariables.tLArr)
+    zTilde_ij = 1 - samplingVariables.zMat[iteratingWordType, iteratingTopic]
+#    zTilde = samplingVariables.zMat.copy()
+#    zTilde[iteratingWordType, iteratingTopic] = 1 - zTilde[iteratingWordType, iteratingTopic]
+#    tTilde = copy.deepcopy(samplingVariables.tLArr)
     
     # resample topics
     # careful: these are changed in-place (don't want to re-allocate a new array every
     # single step), so must be changed back immediately after
     numWordTypesActivatedInTopics = samplingVariables.counts.numWordTypesActivatedInTopic
-    if zTilde[iteratingWordType, iteratingTopic]==1:
+#    if zTilde[iteratingWordType, iteratingTopic]==1:
+    if zTilde_ij==1:
         numWordTypesActivatedInTopics.setRevertable(iteratingTopic,
                                                     numWordTypesActivatedInTopics[iteratingTopic]+1)
     else: 
@@ -105,35 +107,41 @@ def proposeAndAcceptOrReject(iteratingWordType, iteratingTopic, samplingVariable
                                                     numWordTypesActivatedInTopics[iteratingTopic]-1)
     numWordTypesActivatedInTopics.activateRevertableChanges()
     
+    samplingVariables.zMat[iteratingWordType, iteratingTopic] = zTilde_ij
     for r in range(len(LQij)):
         iteratingDoc, iteratingWordPos = LQij[r]
-        tTilde[iteratingDoc][iteratingWordPos] = sampleTGivenZT(
+        samplingVariables.tLArr[iteratingDoc].setRevertable(iteratingWordPos, sampleTGivenZT(
                     activeTopics=samplingVariables.getActiveTopics(),
                     doc=iteratingDoc, 
                     wordPos=iteratingWordPos,
                     alphaTheta=hyperParameters.alphaTheta, 
                     alphaF=hyperParameters.alphaF,
                     textCorpus=textCorpus,
-                    tLArr=tTilde,
-                    zMat=zTilde,
+                    tLArr=samplingVariables.tLArr,
+                    zMat=samplingVariables.zMat,
                     excludeDocWordPositions=LQij[r+1:],
                     numWordTypesActivatedInTopics=numWordTypesActivatedInTopics,
                     numTopicAssignmentsToWordType=\
-                                samplingVariables.counts.numTopicAssignmentsToWordType)
+                                samplingVariables.counts.numTopicAssignmentsToWordType))
+        samplingVariables.tLArr.activateRevertableChanges()
         # update counts
         samplingVariables.counts.numTopicAssignmentsToWordType.addRevertable(
                 (textCorpus[iteratingDoc][iteratingWordPos],
-                 tTilde[iteratingDoc][iteratingWordPos]),
+                 samplingVariables.tLArr[iteratingDoc][iteratingWordPos]),
                 +1)
+        samplingVariables.tLArr.activateRevertableChanges(False)
         samplingVariables.counts.numTopicAssignmentsToWordType.addRevertable(
                 (textCorpus[iteratingDoc][iteratingWordPos],
                  samplingVariables.tLArr[iteratingDoc][iteratingWordPos]),
                 -1)
 
+        samplingVariables.tLArr.activateRevertableChanges()
         samplingVariables.counts.numTopicOccurencesInDoc.addRevertable((iteratingDoc,
-                                                tTilde[iteratingDoc][iteratingWordPos]), + 1)
+                                samplingVariables.tLArr[iteratingDoc][iteratingWordPos]), + 1)
+        samplingVariables.tLArr.activateRevertableChanges(False)
         samplingVariables.counts.numTopicOccurencesInDoc.addRevertable((iteratingDoc,
                                 samplingVariables.tLArr[iteratingDoc][iteratingWordPos]), - 1)
+    samplingVariables.tLArr.activateRevertableChanges()
     samplingVariables.counts.numTopicOccurencesInDoc.activateRevertableChanges()
     samplingVariables.counts.numTopicAssignmentsToWordType.activateRevertableChanges()
     
@@ -147,8 +155,8 @@ def proposeAndAcceptOrReject(iteratingWordType, iteratingTopic, samplingVariable
                         textCorpus=textCorpus, 
                         wordType=iteratingWordType, 
                         topic=iteratingTopic, 
-                        tLArr=tTilde, 
-                        zMat=zTilde,
+                        tLArr=samplingVariables.tLArr, 
+                        zMat=samplingVariables.zMat,
                         gammas=samplingVariables.gammas, 
                         wArr=samplingVariables.wArr, 
                         alphaTheta=hyperParameters.alphaTheta, 
@@ -158,9 +166,11 @@ def proposeAndAcceptOrReject(iteratingWordType, iteratingTopic, samplingVariable
                         numTopicAssignmentsToWordType=samplingVariables.counts.numTopicAssignmentsToWordType)
 
     # change back to the original state
+    samplingVariables.tLArr.activateRevertableChanges(False)
     numWordTypesActivatedInTopics.activateRevertableChanges(False)
     samplingVariables.counts.numTopicOccurencesInDoc.activateRevertableChanges(False)
     samplingVariables.counts.numTopicAssignmentsToWordType.activateRevertableChanges(False)
+    samplingVariables.zMat[iteratingWordType, iteratingTopic] = 1-zTilde_ij
     logprob2 = computeRelativeLogProbabilityForTZ(
                     activeTopics=samplingVariables.getActiveTopics(),
                     textCorpus=textCorpus, 
@@ -184,11 +194,11 @@ def proposeAndAcceptOrReject(iteratingWordType, iteratingTopic, samplingVariable
     # accept or reject
     if prob.flipCoin(ratio):
         # accept
-        samplingVariables.zMat = zTilde
-        samplingVariables.tLArr = tTilde
+        samplingVariables.zMat[iteratingWordType, iteratingTopic] = zTilde_ij
+        samplingVariables.tLArr.makePermanent()
         samplingVariables.counts.docWordPosListForTopicAssignments[iteratingWordType, iteratingTopic] = []
         for (doc,wordPos) in LQij:
-            newTopic = tTilde[doc][wordPos]
+            newTopic = samplingVariables.tLArr[doc][wordPos]
             if (iteratingWordType, newTopic) not in samplingVariables.counts.docWordPosListForTopicAssignments:
                 samplingVariables.counts.docWordPosListForTopicAssignments[iteratingWordType, newTopic] = []
             samplingVariables.counts.docWordPosListForTopicAssignments[iteratingWordType, newTopic].append((doc, wordPos))
@@ -202,6 +212,7 @@ def proposeAndAcceptOrReject(iteratingWordType, iteratingTopic, samplingVariable
     else:
         # reject
         # revert changes to samplingVariables.counts.numTopicAssignmentsToWordType:
+        samplingVariables.tLArr.revert()
         numWordTypesActivatedInTopics.revert()
         samplingVariables.counts.numTopicOccurencesInDoc.revert()
         samplingVariables.counts.numTopicAssignmentsToWordType.revert()

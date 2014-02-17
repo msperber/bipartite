@@ -30,7 +30,7 @@ class GibbsSamplingVariables(object):
         self.zMat = np.empty((vocabSize, nTopics), dtype=np.int8)
 
         # topic assignments
-        self.tLArr = []
+        self.tLArr = RevertableListList()
         
         for doc in textCorpus:
             self.tLArr.append(np.empty(len(doc)))
@@ -51,9 +51,9 @@ class GibbsSamplingVariables(object):
         self.uMat.fill(0.5)
         self.zMat.fill(1)
         for iteratingDoc in range(len(textCorpus)):
-            self.tLArr[iteratingDoc] = np.random.randint(0, 
+            self.tLArr[iteratingDoc] = RevertableList(np.random.randint(0, 
                                                          nTopics, 
-                                                         len(self.tLArr[iteratingDoc]))
+                                                         len(self.tLArr[iteratingDoc])))
         wordFreqs = textCorpus.getVocabFrequencies()
         totalNumWords = textCorpus.getTotalNumWords()
         for iteratingWordType in range(textCorpus.getVocabSize()):
@@ -139,11 +139,52 @@ class RevertableSparseDict(dict):
             self.__setitem__(k, self.tmpDict[k])
         self.tmpDict.clear()
     def __getitem__(self, key):
-        if self.activateRevertable and key in self.tmpDict:
+        if self.activateRevertable and len(self.tmpDict)>0 and key in self.tmpDict:
             return self.tmpDict[key]
         elif key in super(RevertableSparseDict, self).keys():
             return super(RevertableSparseDict, self).__getitem__(key)
         return self.defaultReturnValue
+    def activateRevertableChanges(self, value=True):
+        self.activateRevertable=value
+        
+class RevertableListList(list):
+    def revert(self):
+        for i in self:
+            i.revert()
+    def makePermanent(self):
+        for i in self:
+            i.makePermanent()
+    def activateRevertableChanges(self, value=True):
+        for i in self:
+            i.activateRevertableChanges(value)
+
+class RevertableList(list):
+    """
+    * revertable: can make temporary changes and revert these changes later
+    ** note: revertable actions only change behavior of __getitem__(), not of iterating etc.
+    """ 
+    def __init__(self, *args, **kw):
+        super(RevertableList,self).__init__(*args, **kw)
+        self.tmpDict = {}
+        self.activateRevertable=True
+    def setRevertable(self, index, value):
+        self.tmpDict[index] = value
+    def addRevertable(self, index, value):
+        if index in self.tmpDict:
+            self.tmpDict[index] += value
+        else:
+            self.tmpDict[index] = self.__getitem__(index) + value
+    def revert(self):
+        self.tmpDict.clear()
+    def makePermanent(self):
+        for k in self.tmpDict:
+            self.__setitem__(k, self.tmpDict[k])
+        self.tmpDict.clear()
+    def __getitem__(self, index):
+        if self.activateRevertable and len(self.tmpDict)>0 and index in self.tmpDict:
+            return self.tmpDict[index]
+        else:
+            return super(RevertableList, self).__getitem__(index)
     def activateRevertableChanges(self, value=True):
         self.activateRevertable=value
     
