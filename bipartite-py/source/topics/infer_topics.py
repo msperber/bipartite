@@ -79,7 +79,7 @@ def inferTopicsCollapsedGibbs(textCorpus, hyperParameters, numIterations, numIni
                 print "estimated perplexity:", computeTotalPerplexityFromWordAvg(perplexityWordAvg)
 
     
-    if estimatePerplexityForSplitCorpus is not None:
+    if estimatePerplexityForSplitCorpus is not None and not pplEachIteration:
         print "estimated perplexity:", computeTotalPerplexityFromWordAvg(perplexityWordAvg)
     
     return samplingVariables

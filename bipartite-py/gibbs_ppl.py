@@ -10,11 +10,13 @@ Options:
     --numDocs n     limit number of documents to be loaded
     --updateHyperParams
     --pplEachIteration
-    --alpha x       alpha Hyperparameter [default: 5.0]
-    --tau x         tau Hyperparameter [default: 1.0]
-    --sigma x       sigma Hyperparameter [default: 0.0]
-    --alphaF x      alphaF alphaF [default: 1.0]
-    --alphaTheta x  alphaTheta alphaF [default: 1.0]
+    --alpha x           alpha Hyperparameter [default: 5.0]
+    --tau x             tau Hyperparameter [default: 1.0]
+    --sigma x           sigma Hyperparameter [default: 0.0]
+    --alphaF x          alphaF alphaF [default: 1.0]
+    --alphaTheta x      alphaTheta alphaF [default: 1.0]
+    --numIterations n   number of iterations [default: 100]
+    --vocabSize n       max vocab size [default: 100]
     (as always: -h for help)
 """
 from source.prob import HyperParameters
@@ -45,7 +47,8 @@ def main(argv=None):
     tau = float(arguments.get('--tau'))
     alphaF = float(arguments.get('--alphaF'))
     alphaTheta = float(arguments.get('--alphaTheta'))
-    # TODO: make other parameters configurable
+    numIterations = int(arguments.get('--numIterations'))
+    maxVocabSize = int(arguments.get('--vocabSize'))
     
     ###########################
     ## MAIN PROGRAM ###########
@@ -62,7 +65,6 @@ def main(argv=None):
     print "removing tokens smaller than:", minTokenLen
     removeStopWords=True
     print "removing stopwords:", removeStopWords
-    maxVocabSize=1000
     print "limit vocab size:", maxVocabSize
     minNumTokens=10
     print "remove tokens with frequency <", minNumTokens
@@ -86,7 +88,6 @@ def main(argv=None):
     print "(INITIAL) HYPER PARAMETERS:", hyperParams
     print ""
     
-    numIterations=100
     print "NUM ITERATIONS:",numIterations 
     
     numInitialTopics=10
