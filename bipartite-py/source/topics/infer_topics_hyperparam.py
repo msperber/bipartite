@@ -45,18 +45,18 @@ def sample_alpha(samplingVariables,hyperParameters, a=0.01, b=0.01): # francois 
         #alpha = np.random.gamma(a+K, sigma/( (sum_gamma + tau)^sigma - tau^sigma ) )
 
 # according to improper prior
-def sample_sigma(textCorpus, samplingVariables,hyperParameters, n_MH = 1,rw_st = .05):
+def sample_sigma(textCorpus, samplingVariables,hyperParameters, n_MH = 1,rw_st = .05, logPrior=(lambda x:0)):
     sigma=hyperParameters.sigma
     for i in range(n_MH):
         sigma_new = logistic(logit(sigma) + rw_st*np.random.normal())
         # one of these should be sigma_new?
-        lograte = infer_topics_updates.computeLMarginDistribution(textCorpus=textCorpus, 
+        lograte = logPrior(sigma_new)-logPrior(sigma)+infer_topics_updates.computeLMarginDistribution(textCorpus=textCorpus, 
                                                   gammas=samplingVariables.gammas,
                                                   zMat=samplingVariables.zMat,
                                                   uMat=samplingVariables.uMat,
                                                   activeTopics=samplingVariables.getActiveTopics(),
                                                   alpha=hyperParameters.alpha, 
-                                                  sigma=hyperParameters.sigma,
+                                                  sigma=hyperParameters.sigma_new,
                                                   tau=hyperParameters.tau) \
             - infer_topics_updates.computeLMarginDistribution(textCorpus=textCorpus, 
                                                   gammas=samplingVariables.gammas,
@@ -69,6 +69,12 @@ def sample_sigma(textCorpus, samplingVariables,hyperParameters, n_MH = 1,rw_st =
         if np.random.rand()<math.exp(lograte):
             hyperParameters.sigma = sigma_new
 
+def sample_alphaTheta(textCorpus, samplingVariables,hyperParameters, n_MH = 1,rw_st = .05, logPrior=(lambda x:0)):
+   return 0
+
+def sample_alphaF(textCorpus, samplingVariables,hyperParameters, n_MH = 1,rw_st = .05, logPrior=(lambda x:0)):
+   return 0
+   
 def alphaThetaLogLhood(textCorpus, samplingVariables,hyperParameters):
     alphaTheta=hyperParameters.alphaTheta
     activeTopics=samplingVariables.getActiveTopics()
@@ -81,7 +87,8 @@ def alphaThetaLogLhood(textCorpus, samplingVariables,hyperParameters):
     summand4=0.0
     for iteratingDoc in range(len(textCorpus)):
         for iteratingTopic in activeTopics:
-            summand4 += math.lgamma(alphaTheta/len(activeTopics)+getNumTopicOccurencesInDoc(iteratingTopic, iteratingDoc, samplingVariables.tLArr))
+            nldotj=samplingVariables.count.numTopicOccurencesInDoc.get((iteratingDoc,iteratingTopic),0)
+            summand4 += math.lgamma(alphaTheta/len(activeTopics)+nldotj)
     return summand1+summand2+summand3+summand4
 
 def alphaFLogLhood(textCorpus, samplingVariables,hyperParameters):
@@ -94,11 +101,11 @@ def alphaFLogLhood(textCorpus, samplingVariables,hyperParameters):
 
     for iteratingTopic in activeTopics:
         mj = getNumWordTypesActivatedInTopic(iteratingTopic, samplingVariables.zMat)
-        ndotdotj=getNumTopicAssignments(iteratingTopic, samplingVariables.tLArr, textCorpus) 
+        ndotdotj=getNumTopicAssignments(iteratingTopic, samplingVariables.tLArr, textCorpus) #TODO: replace by chached version 
         summand2+=-mj*math.lgamma(alphaF/mj)-math.lgamma(alphaF+ndotdotj)
         for r in range(mj):            
-            ndotijrj = 0 # ??? Fix dont know how to calculate.
-            summand3=math.lgamma(alphaF/mj+ndotijrj)
+            summand3=samplingVariables.counts.numTopicAssignmentsToWordType[getRthActiveWordTypeInTopic[r,iteratingTopic,samplingVariables.zMat], 
+                                                                            iteratingTopic]
     return summand1+summand2+summand3
 
     
@@ -112,20 +119,20 @@ def logit(p):
 def logistic(x):
     return 1/(1+math.exp(-x))
 
-def sample_tau(textCorpus, samplingVariables,hyperParameters, n_MH = 1,rw_st = .05):
+def sample_tau(textCorpus, samplingVariables,hyperParameters, n_MH = 1,rw_st = .05,logPrior=(lambda x:0)):
 
 # according to improper prior
     tau = hyperParameters.tau
     for _ in range(n_MH):
         tau_new = tau * math.exp(rw_st*np.random.normal())
-        lograte = infer_topics_updates.computeLMarginDistribution(textCorpus=textCorpus, 
+        lograte =logPrior(tau_new)-logPrior(tau)+ infer_topics_updates.computeLMarginDistribution(textCorpus=textCorpus, 
                                                   gammas=samplingVariables.gammas,
                                                   zMat=samplingVariables.zMat,
                                                   uMat=samplingVariables.uMat,
                                                   activeTopics=samplingVariables.getActiveTopics(),
                                                   alpha=hyperParameters.alpha, 
                                                   sigma=hyperParameters.sigma,
-                                                  tau=hyperParameters.tau)+ \
+                                                  tau=hyperParameters.tau_new)+ \
             - infer_topics_updates.computeLMarginDistribution(textCorpus=textCorpus, 
                                                   gammas=samplingVariables.gammas,
                                                   zMat=samplingVariables.zMat,
