@@ -26,7 +26,8 @@ def conditionalPrint(string, condition):
 
 def inferTopicsCollapsedGibbs(textCorpus, hyperParameters, numIterations, numInitialTopics=10,
                               updateHyperparameters=False, verbose=True, 
-                              estimatePerplexityForSplitCorpus=None,pplEachIteration=False):
+                              computeLogLikelihood = True, logLikelihoodEachIteration=True,
+                              estimatePerplexityForSplitCorpus=None, pplEachIteration=False):
     
     # initialize variables
     conditionalPrint("initializing sampler..", verbose)
@@ -58,7 +59,7 @@ def inferTopicsCollapsedGibbs(textCorpus, hyperParameters, numIterations, numIni
         assert oneIfTopicAssignmentsSupported(textCorpus, samplingVariables.tLArr, 
                                               samplingVariables.zMat)==1
                                               
-        if verbose:
+        if verbose and computeLogLikelihood and logLikelihoodEachIteration:
             print "log likelihood:", computeLogLikelihoodTWZ(
                 activeTopics=samplingVariables.getActiveTopics(), 
                 textCorpus=textCorpus, 
@@ -75,14 +76,28 @@ def inferTopicsCollapsedGibbs(textCorpus, hyperParameters, numIterations, numIni
                                     samplingVariables=samplingVariables,
                                     hyperParameters=hyperParameters,
                                     splitCorpus=estimatePerplexityForSplitCorpus)
-            if pplEachIteration:
+            if pplEachIteration and verbose:
                 print "estimated perplexity:", computeTotalPerplexityFromWordAvg(perplexityWordAvg)
 
     
-    if estimatePerplexityForSplitCorpus is not None and not pplEachIteration:
+    if verbose and estimatePerplexityForSplitCorpus is not None and not pplEachIteration:
         print "estimated perplexity:", computeTotalPerplexityFromWordAvg(perplexityWordAvg)
     
-    return samplingVariables
+    retDict = {}
+    retDict['samplingVariables'] = samplingVariables
+    if computeLogLikelihood:
+        retDict['logLikelihood'] = computeLogLikelihoodTWZ(
+                activeTopics=samplingVariables.getActiveTopics(), 
+                textCorpus=textCorpus, 
+                tLArr=samplingVariables.tLArr,
+                zMat=samplingVariables.zMat,
+                alphaTheta=hyperParameters.alphaTheta, 
+                alphaF=hyperParameters.alphaF, 
+                numWordTypesActivatedInTopics=samplingVariables.counts.numWordTypesActivatedInTopic,
+                numTopicOccurencesInDoc=samplingVariables.counts.numTopicOccurencesInDoc)
+    if estimatePerplexityForSplitCorpus is not None:
+        retDict['perplexity'] = computeTotalPerplexityFromWordAvg(perplexityWordAvg)
+    return retDict
         
 
         
