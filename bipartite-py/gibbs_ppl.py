@@ -30,6 +30,7 @@ import sys
 import operator
 import random
 import numpy.random
+import time
 
 import source.topics.infer_topics as infer_topics
 import source.document_data as document_data
@@ -53,6 +54,8 @@ def main(argv=None):
     ###########################
     ## MAIN PROGRAM ###########
     ###########################
+    
+    startTime = time.time()
     
     random.seed(13)
     numpy.random.seed(13)
@@ -102,7 +105,8 @@ def main(argv=None):
                                            estimatePerplexityForSplitCorpus=testCorpus,
                                            pplEachIteration=pplEachIteration)
     
-
+    elapsedTime = (time.time() - startTime)
+    print "elapsed time:", elapsedTime, "seconds"
 
 if __name__ == "__main__":
     sys.exit(main())
