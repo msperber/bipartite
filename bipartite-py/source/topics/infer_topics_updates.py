@@ -28,7 +28,7 @@ def updateUs(textCorpus, samplingVariables):
     """
     for iteratingWordType in range(textCorpus.getVocabSize()):
         for iteratingTopic in samplingVariables.getActiveTopics():
-            if utility.approx_equal(samplingVariables.zMat[iteratingWordType][iteratingTopic], 0.0):
+            if abs(samplingVariables.zMat[iteratingWordType][iteratingTopic] - 0.0) <= 1e-6:
                 samplingVariables.uMat[iteratingWordType][iteratingTopic] = 1.0
             else:
                 samplingVariables.uMat[iteratingWordType][iteratingTopic] = \
@@ -76,8 +76,7 @@ def isOnlyActivatedTopicForWordType(wordType, topic, samplingVariables):
     return getNumActiveTopicsForWordType(wordType, 
                                  samplingVariables.zMat, 
                                  samplingVariables.getActiveTopics()) == 1 \
-        and utility.approx_equal(
-                samplingVariables.zMat[wordType,topic],1)
+        and abs(samplingVariables.zMat[wordType,topic] - 1) <= 1e-6
         
 def proposeAndAcceptOrReject(iteratingWordType, iteratingTopic, samplingVariables, 
                              textCorpus, hyperParameters):
@@ -319,7 +318,7 @@ def updateWGStar(textCorpus, samplingVariables, hyperParameters):
     # TODO: implement sampler for exponentially tilted distribution
     # 
 
-    if (utility.approx_equal( hyperParameters.sigma,0)):
+    if (abs( hyperParameters.sigma - 0) <= 1e-6):
         samplingVariables.gStar = np.random.gamma(
                                     hyperParameters.alpha,
                                     1.0/(hyperParameters.tau+sum(samplingVariables.gammas)))
@@ -351,7 +350,7 @@ def sampleTGivenZT(activeTopics, doc, wordPos, alphaTheta, alphaF, textCorpus, t
                                     textCorpus=textCorpus, 
                                     numTopicAssignmentsToWordTypeDict=numTopicAssignmentsToWordType,
                                     excludeDocWordPositions=[(doc,wordPos)] + excludeDocWordPositions)
-        if utility.approx_equal(zMat[wordType,iteratingTopic], 0):
+        if abs(zMat[wordType,iteratingTopic] - 0) <= 1e-6:
             unnormalizedTopicProbs1.append(0.0)
             unnormalizedTopicProbs2.append(0.0)
         else:
@@ -446,7 +445,7 @@ def oneIfTopicAssignmentsSupported(textCorpus, tLArr, zMat, excludeDocWordPositi
                 continue
             iteratingTopic = tLArr[iteratingDoc][iteratingWordPos]
             iteratingWordType = textCorpus[iteratingDoc][iteratingWordPos]
-            if not utility.approx_equal(zMat[iteratingWordType, iteratingTopic], 1):
+            if not abs(zMat[iteratingWordType, iteratingTopic] - 1) <= 1e-6:
                 return 0
     return 1
 
