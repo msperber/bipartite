@@ -82,7 +82,7 @@ def main(argv=None):
     numInitialTopics=10
     print "NUM INITIAL TOPICS:", numInitialTopics
     
-    infer_topics.inferTopicsCollapsedGibbs(textCorpus=trainCorpus, 
+    infer_topics.inferTopicsCollapsedGibbs(textCorpus=textCorpus, 
                                            hyperParameters=hyperParams, 
                                            numIterations=numIterations, 
                                            numInitialTopics=numInitialTopics,
