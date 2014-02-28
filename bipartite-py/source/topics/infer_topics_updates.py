@@ -365,7 +365,7 @@ def sampleTGivenZT(activeTopics, doc, wordPos, alphaTheta, alphaF, textCorpus, t
 #                       for r in range(numWordTypesActivatedInTopics.get(iteratingTopic,0))])
 #            propProb1 = numerator1 * numerator2 / denominator
             summand1 = math.log(alphaTheta/len(activeTopics) + numTopicAssignmentsToWordTypeCount)
-            summand2 = gammaln(alphaF/numWordTypesActivatedInTopics[iteratingTopic] + numTopicAssignmentsToWordTypeCount)
+            summand2 = gammaln(alphaF/numWordTypesActivatedInTopics[iteratingTopic] + numTopicAssignmentsToWordTypeCount + 1)
             summand3 = -math.log(sum([alphaF/numWordTypesActivatedInTopics[iteratingTopic] + GibbsCounts.getNumTopicAssignmentsToWordTypeExcl(\
                                         wordType=getRthActiveWordTypeInTopic(r, iteratingTopic, zMat),
                                         topic=iteratingTopic, tLArr=tLArr,
