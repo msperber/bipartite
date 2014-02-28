@@ -392,8 +392,9 @@ def computeRelativeLogProbabilityForTZ(activeTopics, textCorpus, wordType, topic
                                        gammas, wArr, alphaTheta, alphaF, 
                                        numWordTypesActivatedInTopics, numTopicOccurencesInDoc,
                                        numTopicAssignmentsToWordType):
-    if oneIfTopicAssignmentsSupported(textCorpus, tLArr, zMat)!=1:
-        return float("-inf")
+    # this check seems useless because it can never get false, but takes up quite some time..
+    #    if oneIfTopicAssignmentsSupported(textCorpus, tLArr, zMat)!=1:
+    #        return float("-inf")
     
     summand1 = zMat[wordType,topic] * math.log(1.0 - math.exp(-gammas[wordType]*wArr[topic]))
     
@@ -445,7 +446,7 @@ def oneIfTopicAssignmentsSupported(textCorpus, tLArr, zMat, excludeDocWordPositi
                 continue
             iteratingTopic = tLArr[iteratingDoc][iteratingWordPos]
             iteratingWordType = textCorpus[iteratingDoc][iteratingWordPos]
-            if not abs(zMat[iteratingWordType, iteratingTopic] - 1) <= 1e-6:
+            if abs(zMat[iteratingWordType, iteratingTopic] - 1) > 0.1:
                 return 0
     return 1
 
@@ -545,8 +546,9 @@ def computeLMarginDistribution(textCorpus, gammas, zMat, uMat, activeTopics, alp
 def computeLogLikelihoodTWZ(activeTopics, textCorpus, tLArr, zMat, 
                 alphaTheta, alphaF, numWordTypesActivatedInTopics, numTopicOccurencesInDoc):
     
-    if oneIfTopicAssignmentsSupported(textCorpus, tLArr, zMat)!=1:
-        return float("-inf")
+    # this check seems useless because it can never get false, but takes up quite some time..
+    #    if oneIfTopicAssignmentsSupported(textCorpus, tLArr, zMat)!=1:
+    #        return float("-inf")
     
     summand3 = 0.0
     for iteratingDoc in range(len(textCorpus)):
