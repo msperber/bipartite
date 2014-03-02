@@ -145,7 +145,6 @@ def proposeAndAcceptOrReject(iteratingWordType, iteratingTopic, samplingVariable
     samplingVariables.counts.numTopicAssignmentsToWordType.activateRevertableChanges()
     
     # compute relative probabilities
-    # TODO: make removal revertable instead of allocating a new list for active topics
     activeTopicsTilde = list(samplingVariables.getActiveTopics())
     if numWordTypesActivatedInTopics[iteratingTopic] == 0:
         activeTopicsTilde.remove(iteratingTopic)
@@ -314,15 +313,11 @@ def updateWGStar(textCorpus, samplingVariables, hyperParameters):
                                         - hyperParameters.sigma,
                                     1.0/(hyperParameters.tau+gammaSum)) 
     
-    # update G*:
-    # TODO: implement sampler for exponentially tilted distribution
-    # 
 
     if (abs( hyperParameters.sigma - 0) <= 1e-6):
         samplingVariables.gStar = np.random.gamma(
                                     hyperParameters.alpha,
                                     1.0/(hyperParameters.tau+sum(samplingVariables.gammas)))
-    #elif utility.approx_equal( hyperParameters.sigma,0.5):
     else :
         samplingVariables.gStar = establernd(hyperParameters.alpha/hyperParameters.sigma,hyperParameters.sigma,
                                              1.0/(hyperParameters.tau+sum(samplingVariables.gammas)),1)[0]
@@ -354,16 +349,6 @@ def sampleTGivenZT(activeTopics, doc, wordPos, alphaTheta, alphaF, textCorpus, t
             unnormalizedTopicProbs1.append(0.0)
             unnormalizedTopicProbs2.append(0.0)
         else:
-#            numerator1 = alphaTheta/len(activeTopics) + numTopicAssignmentsToWordTypeCount
-#            numerator2 = math.gamma(alphaF/numWordTypesActivatedInTopics[iteratingTopic] + numTopicAssignmentsToWordTypeCount)
-#            denominator = sum([alphaF/numWordTypesActivatedInTopics[iteratingTopic] + GibbsCounts.getNumTopicAssignmentsToWordTypeExcl(\
-#                                        wordType=getRthActiveWordTypeInTopic(r, iteratingTopic, zMat),
-#                                        topic=iteratingTopic, tLArr=tLArr,
-#                                        textCorpus=textCorpus, 
-#                                        numTopicAssignmentsToWordTypeDict=numTopicAssignmentsToWordType,
-#                                        excludeDocWordPositions=[(doc,wordPos)] + excludeDocWordPositions) \
-#                       for r in range(numWordTypesActivatedInTopics.get(iteratingTopic,0))])
-#            propProb1 = numerator1 * numerator2 / denominator
             summand1 = math.log(alphaTheta/len(activeTopics) + numTopicAssignmentsToWordTypeCount)
             summand2 = gammaln(alphaF/numWordTypesActivatedInTopics[iteratingTopic] + numTopicAssignmentsToWordTypeCount + 1)
             summand3 = -math.log(sum([alphaF/numWordTypesActivatedInTopics[iteratingTopic] + GibbsCounts.getNumTopicAssignmentsToWordTypeExcl(\
@@ -374,18 +359,9 @@ def sampleTGivenZT(activeTopics, doc, wordPos, alphaTheta, alphaF, textCorpus, t
                                         excludeDocWordPositions=[(doc,wordPos)] + excludeDocWordPositions) \
                        for r in range(numWordTypesActivatedInTopics.get(iteratingTopic,0))]))
             propProb2 = math.exp(summand1 + summand2 + summand3)
-#            print "propProb1, propProb2", propProb1, propProb2
-#            if abs(propProb1 - propProb2) > 0.001:
-#                print "stop"
-#            assert_almost_equal(propProb1, propProb2)
-#            unnormalizedTopicProbs1.append(propProb1)
             unnormalizedTopicProbs2.append(propProb2)
-#    normalizer1 = sum(unnormalizedTopicProbs1)
     normalizer2 = sum(unnormalizedTopicProbs2)
-#    normalizedTopicProbs1 = [p / normalizer1 for p in unnormalizedTopicProbs1]
     normalizedTopicProbs2 = [p / normalizer2 for p in unnormalizedTopicProbs2]
-    # TODO: wtf.. using logs produces virtually the same numbers, but still screws up the test result..
-#    print "normalizedTopicProbs", normalizedTopicProbs1, normalizedTopicProbs2
     return activeTopics[np.nonzero(np.random.multinomial(1, normalizedTopicProbs2))[0][0]]
 
 def computeRelativeLogProbabilityForTZ(activeTopics, textCorpus, wordType, topic, tLArr, zMat, 
