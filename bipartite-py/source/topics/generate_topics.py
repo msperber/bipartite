@@ -9,6 +9,7 @@ import source.prob as prob
 from source.topics.infer_topics_hyperparam import HyperParameters
 import source.expressions as expr
 from source.document_data import *
+from source.topics.state import GibbsSamplingVariables
 import random
 
 class BipartiteTopicGenerator(object):
@@ -19,24 +20,30 @@ class BipartiteTopicGenerator(object):
         # * numWordsPerDocument
         # * a_gamma, b_gamma => draw gammas
         
-        np.random.seed(15)
-        random.seed(15)
         
-        gammas = self.sampleGammas(vocabSize, hyperParameters.aGamma, hyperParameters.bGamma)
+        dummyCorpus = DocumentCorpus(vocabSize=vocabSize)
+        for _ in range(numDocuments):
+            dummyCorpus.append(Document())
+            for _ in range(numWordsPerDocument):
+                dummyCorpus[-1].append(0)
+        samplingVariables = GibbsSamplingVariables(textCorpus=dummyCorpus, vocabSize=vocabSize)
+        
+        
+        samplingVariables.gammas = self.sampleGammas(vocabSize, hyperParameters.aGamma, hyperParameters.bGamma)
         
         K = []
-        K.append(self.drawNumTopicsFirstWord(gammas[0]))
+        K.append(self.drawNumTopicsFirstWord(samplingVariables.gammas[0], hyperParameters))
         
         mj = [1] * int(K[-1])
         
-        z = np.zeros((vocabSize, K[0]))
-        u = np.zeros((vocabSize, K[0]))
+        samplingVariables.zMat = np.zeros((vocabSize, K[0]))
+        samplingVariables.uMat = np.zeros((vocabSize, K[0]))
         for iteratingTopic in range(int(K[0])):
-            z[0,iteratingTopic] = 1
-            u[0,iteratingTopic] = self.sampleNextU(iteratingWordType=0, 
+            samplingVariables.zMat[0,iteratingTopic] = 1
+            samplingVariables.uMat[0,iteratingTopic] = self.sampleNextU(iteratingWordType=0, 
                                                    iteratingTopic=iteratingTopic, 
-                                                   u=u, 
-                                                   gammas=gammas, 
+                                                   u=samplingVariables.uMat, 
+                                                   gammas=samplingVariables.gammas, 
                                                    mj=mj, 
                                                    hyperParameters=hyperParameters)
         
@@ -44,36 +51,37 @@ class BipartiteTopicGenerator(object):
             for iteratingTopic in range(int(K[iteratingWordType-1])):
                 zij = self.sampleZEntry(curWordType=iteratingWordType, 
                                         curTopic=iteratingTopic,
-                                        gammas=gammas, 
-                                        u=u, 
+                                        gammas=samplingVariables.gammas, 
+                                        u=samplingVariables.uMat, 
                                         mj=mj, 
                                         hyperParameters=hyperParameters)
-                z[iteratingWordType, iteratingTopic] = zij
+                samplingVariables.zMat[iteratingWordType, iteratingTopic] = zij
                 if zij==1:
                     mj[iteratingTopic] += 1
-            Kiplus = self.drawNumNewTopics(gammas=gammas, 
+            Kiplus = self.drawNumNewTopics(gammas=samplingVariables.gammas, 
                                            curWordType=iteratingWordType, 
                                            hyperParameters=hyperParameters)
             K.append(K[iteratingWordType-1] + Kiplus)
-            z = np.column_stack( [ z , np.zeros((vocabSize,Kiplus))])
-            u = np.column_stack( [ u , np.zeros((vocabSize,Kiplus))])
+            samplingVariables.zMat = np.column_stack( [ samplingVariables.zMat , np.zeros((vocabSize,Kiplus))])
+            samplingVariables.uMat = np.column_stack( [ samplingVariables.uMat , np.zeros((vocabSize,Kiplus))])
             mj += [1] * Kiplus
             for iteratingTopic in range(K[iteratingWordType-1], K[iteratingWordType]):
-                z[iteratingWordType,iteratingTopic] = 1
-                u[iteratingWordType,iteratingTopic] = self.sampleNextU(iteratingWordType=iteratingWordType, 
+                samplingVariables.zMat[iteratingWordType,iteratingTopic] = 1
+                samplingVariables.uMat[iteratingWordType,iteratingTopic] = self.sampleNextU(iteratingWordType=iteratingWordType, 
                                                    iteratingTopic=iteratingTopic, 
-                                                   u=u, 
-                                                   gammas=gammas, 
+                                                   u=samplingVariables.uMat, 
+                                                   gammas=samplingVariables.gammas, 
                                                    mj=mj, 
                                                    hyperParameters=hyperParameters)
-        f = np.zeros(z.shape)
+        samplingVariables.activeTopics = range(K[-1])
+        f = np.zeros(samplingVariables.zMat.shape)
         for iteratingTopic in range(K[-1]):
             fij = self.drawTopicWordDistribution(alphaF=hyperParameters.alphaF, 
                                             c_f=self.identity, 
                                             numTopics = mj[iteratingTopic])
             fij_index = 0
             for iteratingWordType in range(vocabSize):
-                if z[iteratingWordType, iteratingTopic] == 1:
+                if samplingVariables.zMat[iteratingWordType, iteratingTopic] == 1:
                     f[iteratingWordType, iteratingTopic]  = fij[fij_index]
                     fij_index += 1
     
@@ -82,26 +90,35 @@ class BipartiteTopicGenerator(object):
             theta.append(self.drawDocumentTopics(alphaTheta=hyperParameters.alphaTheta, 
                                                  c_theta=self.identity, numTopics = K[-1]))
 #            theta.append([1.0/K[-1]] * K[-1])
-            assert 0.99 < np.sum(theta[-1]) < 1.0001
+            if K[-1]>0 and not 0.99 < np.sum(theta[-1]) < 1.0001:
+                print theta[-1]
+                assert 0.99 < np.sum(theta[-1]) < 1.0001
 #            
-        docs = DocumentCorpus()
+        docs = DocumentCorpus(vocabSize=vocabSize)
         emptyWord = -1
         for iteratingDocNo in range(numDocuments):
             docs.append(Document())
-            for _ in range(numWordsPerDocument):
+            for iteratingWordPos in range(numWordsPerDocument):
                 tlk = self.drawTopicForWord(topicProportions=theta[iteratingDocNo])
+                samplingVariables.tLArr[iteratingDocNo][iteratingWordPos] = tlk
                 if mj[tlk]==0:
                     docs[-1].append(emptyWord)
                 else:
                     docs[-1].append(self.drawWordFromTopic(wordDistribution=f[:,tlk].transpose()))
-        return docs
+                    
+        samplingVariables.textCorpus = docs
+        samplingVariables.initCounts(docs)
+        return samplingVariables
     
     def identity(self, x): return x
     
     def sampleGammas(self, vocabSize, aGamma, bGamma):
-        return [np.random.gamma(aGamma, 1/bGamma) for _ in range(vocabSize)]
+        return [self.sampleOneGamma(aGamma, bGamma) for _ in range(vocabSize)]
     
-    def drawNumTopicsFirstWord(self, gamma0):
+    def sampleOneGamma(self, aGamma, bGamma):
+        return np.random.gamma(aGamma, 1/bGamma)
+    
+    def drawNumTopicsFirstWord(self, gamma0, hyperParameters):
         return np.random.poisson(expr.psiFunction(gamma0, 
                                                   hyperParameters.alpha, 
                                                   hyperParameters.sigma, 
@@ -139,9 +156,12 @@ class BipartiteTopicGenerator(object):
     def drawWordFromTopic(self, wordDistribution):
         return np.nonzero(np.random.multinomial(1, wordDistribution, size=1))[1][0]
 
-hyperParameters = HyperParameters(alpha=5.0, sigma=0.5, tau=1.0, alphaTheta=1.0, 
-                                          alphaF=1.0, aGamma=1.0, bGamma=1.0)
-BipartiteTopicGenerator().generateTopics(vocabSize=15, 
-                                         numDocuments=6, 
-                                         numWordsPerDocument=5, 
-                                         hyperParameters=hyperParameters)
+#np.random.seed(15)
+#random.seed(15)
+#
+#hyperParameters = HyperParameters(alpha=5.0, sigma=0.5, tau=1.0, alphaTheta=1.0, 
+#                                          alphaF=1.0, aGamma=1.0, bGamma=1.0)
+#BipartiteTopicGenerator().generateTopics(vocabSize=15, 
+#                                         numDocuments=6, 
+#                                         numWordsPerDocument=5, 
+#                                         hyperParameters=hyperParameters)
