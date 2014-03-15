@@ -13,7 +13,7 @@ from numpy.ma.testutils import assert_almost_equal
 from nose.tools.nontrivial import nottest
 from source.topics.infer_topics_hyperparam import HyperParameters
 from matplotlib import test
-from source.topics.infer_topics_state import RevertableSparseDict
+from source.topics.state import RevertableSparseDict
 class TopicStateTestCase (unittest.TestCase):
     
     doc1a = Document(wordIndexList = [0,1,2,4])
@@ -57,6 +57,7 @@ class TopicStateTestCase (unittest.TestCase):
         vocabSize = 7
         nDocs = 3
         sVars = GibbsSamplingVariables(self.textCorpus1, nTopics = nTopics)
+        sVars.initWithFullTopicsAndGammasFromFrequencies(self.textCorpus1, nTopics = nTopics)
         for i in range(vocabSize):
             for j in range(nTopics):
                 assert (sVars.zMat[i,j] == 1 and 0.0 <= sVars.uMat[i,j] < 1.0) \
@@ -73,6 +74,7 @@ class TopicStateTestCase (unittest.TestCase):
     def test_GibbsSamplingVariables_initialize_4topics_gammasFromFrequencies(self):
         nTopics = 4
         sVars = GibbsSamplingVariables(self.textCorpus1, nTopics = nTopics)
+        sVars.initWithFullTopicsAndGammasFromFrequencies(self.textCorpus1, nTopics = nTopics)
         assert_almost_equal(3.0/12.0, sVars.gammas[0])
         assert_almost_equal(2.0/12.0, sVars.gammas[1])
         assert_almost_equal(2.0/12.0, sVars.gammas[2])
@@ -85,6 +87,7 @@ class TopicStateTestCase (unittest.TestCase):
         nTopics = 4
         vocabSize = 7
         sVars = GibbsSamplingVariables(self.textCorpus1, nTopics = nTopics)
+        sVars.initWithFullTopicsAndGammasFromFrequencies(self.textCorpus1, nTopics = nTopics)
         for i in range(vocabSize):
             for j in range(nTopics):
                 assert (sVars.zMat[i,j] == 1 and 0.0 <= sVars.uMat[i,j] < 1.0)
@@ -156,7 +159,7 @@ class TopicStateTestCase (unittest.TestCase):
     
     def test_getNumWordTypesActivatedInTopic(self):
         sVars = GibbsSamplingVariables(self.textCorpus1, nTopics = 4)
-        
+        sVars.initWithFullTopicsAndGammasFromFrequencies(self.textCorpus1, nTopics = 4)
         assert getNumWordTypesActivatedInTopic(0, sVars.zMat) == self.textCorpus1.getVocabSize()
     
         sVars.zMat[1,0] = 0
@@ -164,6 +167,7 @@ class TopicStateTestCase (unittest.TestCase):
     
     def test_getRthActiveWordTypeInTopic(self):
         sVars = GibbsSamplingVariables(self.textCorpus1, nTopics = 4)
+        sVars.initWithFullTopicsAndGammasFromFrequencies(self.textCorpus1, nTopics = 4)
         assert getRthActiveWordTypeInTopic(0, 0, sVars.zMat) == 0
         assert getRthActiveWordTypeInTopic(1, 0, sVars.zMat) == 1
         assert getRthActiveWordTypeInTopic(2, 0, sVars.zMat) == 2
@@ -183,7 +187,8 @@ class TopicStateTestCase (unittest.TestCase):
         assert_raises(IndexError, getRthActiveWordTypeInTopic, 5, 0, sVars.zMat)
     
     def test_oneIfTopicAssignmentsSupported(self):
-        sVars = GibbsSamplingVariables(self.textCorpus1, nTopics = 4)
+        sVars = GibbsSamplingVariables(self.textCorpus1, nTopics = 4) 
+        sVars.initWithFullTopicsAndGammasFromFrequencies(self.textCorpus1, nTopics = 4)
         assert oneIfTopicAssignmentsSupported(self.textCorpus1, sVars.tLArr, sVars.zMat)==1
         sVars.zMat[self.textCorpus1[0][0], sVars.tLArr[0][0]] = 0
         assert oneIfTopicAssignmentsSupported(self.textCorpus1, sVars.tLArr, sVars.zMat)==0

@@ -28,18 +28,22 @@ class DocumentCorpus(list):
     """
     a corpus is a list of bags of words (access documents like with a normal python list)
     """
-    def __init__(self, documents=[], vocab=None):
+    def __init__(self, documents=[], vocab=None, vocabSize=None):
         self.extend(documents)
         self.vocab = vocab
         if vocab is not None:
             assert max([0] + [max(doc) for doc in documents if len(doc)>0]) + 1 <= len(vocab)
+            assert vocabSize is None
+        self.vocabSize = vocabSize
     def getVocabList(self):
         if self.vocab is None:
             raise Exception("no vocab was specified")
         else:
             return self.vocab
     def getVocabSize(self):
-        if self.vocab is None:
+        if self.vocabSize is not None:
+            return self.vocabSize
+        elif self.vocab is None:
             # assume 0-indexed vocab
             return max([max(doc) for doc in self if len(doc)>0]) + 1
         else:

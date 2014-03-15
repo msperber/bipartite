@@ -12,7 +12,7 @@ import math
 import source.expressions as expr
 import random
 import copy
-from infer_topics_state import * # ?? not sure if good idea
+from state import * # ?? not sure if good idea
 
 
 class HyperParameters(object):

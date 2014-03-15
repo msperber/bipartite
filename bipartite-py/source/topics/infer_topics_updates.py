@@ -14,7 +14,7 @@ import copy
 from source.exptiltedstable import *
 from scipy.special import gammaln
 
-from infer_topics_state import *
+from state import *
 from source.expressions import psiTildeFunction, kappaFunction, psiFunction
 from numpy.ma.testutils import assert_almost_equal
 
@@ -273,9 +273,10 @@ def createNewTopics(iteratingWordType, textCorpus, samplingVariables, hyperParam
                 samplingVariables.counts.numWordTypesActivatedInTopic.get(newTopic,0) + 1
 
         samplingVariables.wArr[newTopic] = 1.0
-        for iteratingWordType2 in range(samplingVariables.uMat.shape[0]):
-            samplingVariables.gammas[iteratingWordType2] = \
-                    float(wordFreqs[iteratingWordType2]) / float(totalNumWords) 
+        # this seems like a bug:
+#        for iteratingWordType2 in range(samplingVariables.uMat.shape[0]):
+#            samplingVariables.gammas[iteratingWordType2] = \
+#                    float(wordFreqs[iteratingWordType2]) / float(totalNumWords) 
         
         # fill the new zMat row with all zeros, except for word i for which it should be 1
 
@@ -337,6 +338,8 @@ def updateTs(textCorpus, samplingVariables, hyperParameters):
     
 def updateWGStar(textCorpus, samplingVariables, hyperParameters):
     # update wArr:
+    if samplingVariables.wArr.shape[0] < samplingVariables.zMat.shape[1]:
+        samplingVariables.wArr = np.empty((samplingVariables.zMat.shape[1],))
     for iteratingTopic in samplingVariables.getActiveTopics():
 
         gammaSum= sum([samplingVariables.gammas[i]*samplingVariables.uMat[i,iteratingTopic] \
@@ -477,8 +480,10 @@ def computeRelativeLogProbabilityForTZSimplified(activeTopics, textCorpus, wordT
     if oneIfTopicAssignmentsSupported(textCorpus, tLArr, zMat)!=1:
         return float("-inf")
     
-    summand1 = zMat[wordType,topic] * math.log(1.0 - math.exp(-gammas[wordType]*wArr[topic]))
-    
+    try:
+        summand1 = zMat[wordType,topic] * math.log(1.0 - math.exp(-gammas[wordType]*wArr[topic]))
+    except ValueError:
+        print "stop"
     summand2 = -(1-zMat[wordType,topic])*gammas[wordType]*wArr[topic]
     
     summand3 = 0.0 

@@ -12,7 +12,7 @@ import source.expressions as expr
 import random
 import copy
 from infer_topics_updates import *
-from infer_topics_state import *
+from state import *
 from infer_topics_hyperparam import *
 from perplexity import *
 

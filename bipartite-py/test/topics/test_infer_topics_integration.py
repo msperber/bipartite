@@ -27,7 +27,7 @@ class TopicIntegrationTestCase (unittest.TestCase):
         random.seed(13)
         np.random.seed(13)
  
-#    @nottest
+    @nottest
     def test_inferTopicsCollapsedGibbs_runsWithoutException(self):
         self.seedRandomGeneratorsDeterministically()
         hyperParameters = HyperParameters(alpha=5.0, sigma=0.5, tau=1.0, alphaTheta=1.0, 

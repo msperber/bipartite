@@ -13,15 +13,16 @@ import random
 import copy
 
 class GibbsSamplingVariables(object):
-    def __init__(self, textCorpus, nTopics = 1):
+    
+    def __init__(self, textCorpus, nTopics = 1, vocabSize=None):
         self.deadTopics, self.activeTopics = [], []
         self.textCorpus = textCorpus
-        self.allocateVars(textCorpus, nTopics)
-        self.initWithFullTopicsAndGammasFromFrequencies(textCorpus, nTopics)
+        self.allocateVars(textCorpus, nTopics, vocabSize=vocabSize)
         self.counts = None
         
-    def allocateVars(self, textCorpus, nTopics):
-        vocabSize = textCorpus.getVocabSize()
+    def allocateVars(self, textCorpus, nTopics, vocabSize=None):
+        if vocabSize is None:
+            vocabSize = textCorpus.getVocabSize()
         
         # scores for word-types in topics:
         self.uMat = np.empty((vocabSize, nTopics)) 
@@ -33,7 +34,7 @@ class GibbsSamplingVariables(object):
         self.tLArr = RevertableListList()
         
         for doc in textCorpus:
-            self.tLArr.append(np.empty(len(doc)))
+            self.tLArr.append(RevertableList(np.empty(len(doc))))
             
         # reading interest ("word popularity")
         self.gammas = np.empty((vocabSize,))
@@ -60,6 +61,9 @@ class GibbsSamplingVariables(object):
             self.gammas[iteratingWordType] = \
                         float(wordFreqs[iteratingWordType]) / float(totalNumWords)
         self.wArr.fill(1.0)
+        self.initCounts(textCorpus)
+    
+    def initCounts(self, textCorpus):
         self.counts = GibbsCounts(textCorpus, self)
     
     # approach to managing active & dead topics: both are stored in (complementary) lists,
