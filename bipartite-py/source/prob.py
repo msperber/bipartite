@@ -50,6 +50,11 @@ def flipCoin(p):
 def sampleFrom15(gammas, uxjList, mj, parameters):
     '''
         sample from distribution [Caron 2012, equation 15]
+        
+        gammas: one for each word up to and including the current one
+        uxjList: u's sampled so far, for all words before the current one
+        mj: num words active in current topic
+        parameters: should have a 'tau' and a 'sigma' field
     '''
     assert len(gammas) == len(uxjList)+1
     y = random.random()
@@ -59,10 +64,7 @@ def sampleFrom15(gammas, uxjList, mj, parameters):
     if -0.00001 < mj - sigma < 0.00001:
         return ((tau+sjn)/gammas[-1])*((1.0+(gammas[-1]/(tau+sjn)))**y - 1.0)
     else:
-        try:
-            return (1.0/gammas[-1])*(((tau+sjn)**(-mj+sigma)+y*((tau+sjn+gammas[-1])**(-mj+sigma)-(tau+sjn)**(-mj+sigma)))**(1.0/(-mj+sigma))-(tau+sjn))
-        except ZeroDivisionError:
-            return 5 # TODO: why 5? also, this event should never occur..
+        return (1.0/gammas[-1])*(((tau+sjn)**(-mj+sigma)+y*((tau+sjn+gammas[-1])**(-mj+sigma)-(tau+sjn)**(-mj+sigma)))**(1.0/(-mj+sigma))-(tau+sjn))
             
 #def sampleTExp1(lam):
 #    y=random.random()

@@ -120,6 +120,7 @@ def proposeAndAcceptOrReject(iteratingWordType, iteratingTopic, samplingVariable
                     zMat=samplingVariables.zMat,
                     excludeDocWordPositions=LQij[r+1:],
                     numWordTypesActivatedInTopics=numWordTypesActivatedInTopics,
+                    numTopicOccurencesInDoc=samplingVariables.counts.numTopicOccurencesInDoc,
                     numTopicAssignmentsToWordType=\
                                 samplingVariables.counts.numTopicAssignmentsToWordType))
         samplingVariables.tLArr.activateRevertableChanges()
@@ -146,9 +147,25 @@ def proposeAndAcceptOrReject(iteratingWordType, iteratingTopic, samplingVariable
     
     # compute relative probabilities
     activeTopicsTilde = list(samplingVariables.getActiveTopics())
-    if numWordTypesActivatedInTopics[iteratingTopic] == 0:
+    topicCouldBeDying = (numWordTypesActivatedInTopics[iteratingTopic] == 0)
+    if topicCouldBeDying:
         activeTopicsTilde.remove(iteratingTopic)
-    logprob1 = computeRelativeLogProbabilityForTZ(
+        logprob1 = computeRelativeLogProbabilityForTZSafe(
+                        activeTopics=activeTopicsTilde,
+                        textCorpus=textCorpus, 
+                        wordType=iteratingWordType, 
+                        topic=iteratingTopic, 
+                        tLArr=samplingVariables.tLArr, 
+                        zMat=samplingVariables.zMat,
+                        gammas=samplingVariables.gammas, 
+                        wArr=samplingVariables.wArr, 
+                        alphaTheta=hyperParameters.alphaTheta, 
+                        alphaF=hyperParameters.alphaF,
+                        numWordTypesActivatedInTopics=numWordTypesActivatedInTopics,
+                        numTopicOccurencesInDoc=samplingVariables.counts.numTopicOccurencesInDoc,
+                        numTopicAssignmentsToWordType=samplingVariables.counts.numTopicAssignmentsToWordType)
+    else:
+        logprob1 = computeRelativeLogProbabilityForTZSimplified(
                         activeTopics=activeTopicsTilde,
                         textCorpus=textCorpus, 
                         wordType=iteratingWordType, 
@@ -169,7 +186,23 @@ def proposeAndAcceptOrReject(iteratingWordType, iteratingTopic, samplingVariable
     samplingVariables.counts.numTopicOccurencesInDoc.activateRevertableChanges(False)
     samplingVariables.counts.numTopicAssignmentsToWordType.activateRevertableChanges(False)
     samplingVariables.zMat[iteratingWordType, iteratingTopic] = 1-zTilde_ij
-    logprob2 = computeRelativeLogProbabilityForTZ(
+    if topicCouldBeDying:
+        logprob2 = computeRelativeLogProbabilityForTZSafe(
+                    activeTopics=samplingVariables.getActiveTopics(),
+                    textCorpus=textCorpus, 
+                    wordType=iteratingWordType, 
+                    topic=iteratingTopic,
+                    tLArr=samplingVariables.tLArr, 
+                    zMat=samplingVariables.zMat,
+                    gammas=samplingVariables.gammas, 
+                    wArr=samplingVariables.wArr, 
+                    alphaTheta=hyperParameters.alphaTheta, 
+                    alphaF=hyperParameters.alphaF,
+                    numWordTypesActivatedInTopics=numWordTypesActivatedInTopics,
+                    numTopicOccurencesInDoc=samplingVariables.counts.numTopicOccurencesInDoc,
+                    numTopicAssignmentsToWordType=samplingVariables.counts.numTopicAssignmentsToWordType)
+    else:
+        logprob2 = computeRelativeLogProbabilityForTZSimplified(
                     activeTopics=samplingVariables.getActiveTopics(),
                     textCorpus=textCorpus, 
                     wordType=iteratingWordType, 
@@ -273,6 +306,7 @@ def updateTs(textCorpus, samplingVariables, hyperParameters):
                             textCorpus=textCorpus, 
                             tLArr=samplingVariables.tLArr, 
                             zMat=samplingVariables.zMat,
+                            numTopicOccurencesInDoc=samplingVariables.counts.numTopicOccurencesInDoc,
                             numWordTypesActivatedInTopics=samplingVariables.counts.numWordTypesActivatedInTopic, 
                             numTopicAssignmentsToWordType=samplingVariables.counts.numTopicAssignmentsToWordType, 
                             excludeDocWordPositions=[(iteratingDocument, iteratingWordPos)])
@@ -336,22 +370,27 @@ def updateGammas(textCorpus, samplingVariables, hyperParameters):
     
 def sampleTGivenZT(activeTopics, doc, wordPos, alphaTheta, alphaF, textCorpus, tLArr, 
                    zMat, numWordTypesActivatedInTopics, numTopicAssignmentsToWordType,
+                   numTopicOccurencesInDoc,
+                   c_theta = expr.c_theta_K,
+                   c_f = expr.c_f_mj,
                    excludeDocWordPositions=[]):
     unnormalizedTopicProbs1, unnormalizedTopicProbs2 = [], []
     wordType = textCorpus[doc][wordPos]
     for iteratingTopic in activeTopics:
-        numTopicAssignmentsToWordTypeCount = GibbsCounts.getNumTopicAssignmentsToWordTypeExcl(\
-                                    wordType=wordType, topic=iteratingTopic, tLArr=tLArr,
-                                    textCorpus=textCorpus, 
-                                    numTopicAssignmentsToWordTypeDict=numTopicAssignmentsToWordType,
-                                    excludeDocWordPositions=[(doc,wordPos)] + excludeDocWordPositions)
         if abs(zMat[wordType,iteratingTopic] - 0) <= 1e-6:
             unnormalizedTopicProbs1.append(0.0)
             unnormalizedTopicProbs2.append(0.0)
         else:
-            summand1 = math.log(alphaTheta/len(activeTopics) + numTopicAssignmentsToWordTypeCount)
-            summand2 = gammaln(alphaF/numWordTypesActivatedInTopics[iteratingTopic] + numTopicAssignmentsToWordTypeCount + 1)
-            summand3 = -math.log(sum([alphaF/numWordTypesActivatedInTopics[iteratingTopic] + GibbsCounts.getNumTopicAssignmentsToWordTypeExcl(\
+            numTopicAssignmentsToDocCount = numTopicOccurencesInDoc.get((doc, iteratingTopic), 0)
+            numTopicAssignmentsToWordTypeCount = GibbsCounts.getNumTopicAssignmentsToWordTypeExcl(\
+                                        wordType=wordType, topic=iteratingTopic, tLArr=tLArr,
+                                        textCorpus=textCorpus, 
+                                        numTopicAssignmentsToWordTypeDict=numTopicAssignmentsToWordType,
+                                        excludeDocWordPositions=[(doc,wordPos)] + excludeDocWordPositions)
+            summand1 = math.log(alphaTheta/c_theta(len(activeTopics)) + numTopicAssignmentsToDocCount)
+            summand2 = gammaln(alphaF/c_f(numWordTypesActivatedInTopics[iteratingTopic]) + numTopicAssignmentsToWordTypeCount + 1.0)
+            summand3 = -math.log(alphaF*numWordTypesActivatedInTopics[iteratingTopic]/c_f(numWordTypesActivatedInTopics[iteratingTopic]) \
+                                 + sum([GibbsCounts.getNumTopicAssignmentsToWordTypeExcl(\
                                         wordType=getRthActiveWordTypeInTopic(r, iteratingTopic, zMat),
                                         topic=iteratingTopic, tLArr=tLArr,
                                         textCorpus=textCorpus, 
@@ -364,13 +403,16 @@ def sampleTGivenZT(activeTopics, doc, wordPos, alphaTheta, alphaF, textCorpus, t
     normalizedTopicProbs2 = [p / normalizer2 for p in unnormalizedTopicProbs2]
     return activeTopics[np.nonzero(np.random.multinomial(1, normalizedTopicProbs2))[0][0]]
 
-def computeRelativeLogProbabilityForTZ(activeTopics, textCorpus, wordType, topic, tLArr, zMat, 
+def computeRelativeLogProbabilityForTZSafe(activeTopics, textCorpus, wordType, topic, tLArr, zMat, 
                                        gammas, wArr, alphaTheta, alphaF, 
                                        numWordTypesActivatedInTopics, numTopicOccurencesInDoc,
-                                       numTopicAssignmentsToWordType):
+                                       numTopicAssignmentsToWordType,
+                                       c_theta = expr.c_theta_K,
+                                       c_f = expr.c_f_mj ):
+    
     # this check seems useless because it can never get false, but takes up quite some time..
-    #    if oneIfTopicAssignmentsSupported(textCorpus, tLArr, zMat)!=1:
-    #        return float("-inf")
+    if oneIfTopicAssignmentsSupported(textCorpus, tLArr, zMat)!=1:
+        return float("-inf")
     
     summand1 = zMat[wordType,topic] * math.log(1.0 - math.exp(-gammas[wordType]*wArr[topic]))
     
@@ -378,41 +420,103 @@ def computeRelativeLogProbabilityForTZ(activeTopics, textCorpus, wordType, topic
     
     summand3 = 0.0
     for iteratingDoc in range(len(textCorpus)):
-        summand3 += gammaln(alphaTheta) - len(activeTopics)*gammaln(alphaTheta/len(activeTopics))
-        
-    summand4 = 0.0 
+        summand3 += gammaln(len(activeTopics)/c_theta(len(activeTopics)) * alphaTheta)
+    
+    summand4 = -len(activeTopics) * gammaln(alphaTheta/c_theta(len(activeTopics)))
+     
+    summand5 = 0.0 
     for iteratingDoc in range(len(textCorpus)):
         for iteratingTopic in activeTopics:
-            summand4 += gammaln(alphaTheta/len(activeTopics) + \
+            summand5 += gammaln(alphaTheta/c_theta(len(activeTopics)) + \
                                 numTopicOccurencesInDoc.get((iteratingDoc, iteratingTopic), 0.0))
-            summand4 -= gammaln(alphaTheta + \
+            summand5 -= gammaln(len(activeTopics)/c_theta(len(activeTopics))*alphaTheta + \
                                 numTopicOccurencesInDoc.get((iteratingDoc, iteratingTopic),0.0))
+    
+    if numWordTypesActivatedInTopics[topic] > 0:
+        summand6 = gammaln(numWordTypesActivatedInTopics[topic] \
+                           /  c_f(numWordTypesActivatedInTopics[topic])) * alphaF
+        summand7 = -numWordTypesActivatedInTopics[topic] \
+                        * gammaln(alphaF / c_f(numWordTypesActivatedInTopics[topic]))
+    else:
+        summand6, summand7 = 0, 0
         
-    summand5 = 0.0
+    summand8 = 0.0
     for iteratingTopic in activeTopics:
-        summand5 += gammaln(alphaF) - numWordTypesActivatedInTopics[iteratingTopic] \
-                                * gammaln(alphaF / numWordTypesActivatedInTopics[iteratingTopic])
+        numWordsAssignedToTopic = 0.0
+        for r in range(numWordTypesActivatedInTopics[iteratingTopic]):
+            numWordsAssignedToTopic = +numTopicAssignmentsToWordType[(iteratingTopic, 
+                                                               getRthActiveWordTypeInTopic(
+                                                                            r=r, 
+                                                                            topic=iteratingTopic,
+                                                                            zMat=zMat))]
 
-    summand6 = 0.0
-    for iteratingTopic in activeTopics:
         for r in range(numWordTypesActivatedInTopics[iteratingTopic]):
             topicsForWord = numTopicAssignmentsToWordType[(iteratingTopic, 
                                                                getRthActiveWordTypeInTopic(
                                                                             r=r, 
                                                                             topic=iteratingTopic,
                                                                             zMat=zMat))]
-#            getNumTopicAssignmentsToWordType(
-#                                                    topic=iteratingTopic, 
-#                                                    wordType=getRthActiveWordTypeInTopic(
-#                                                                            r=r, 
-#                                                                            topic=iteratingTopic,
-#                                                                            zMat=zMat), 
-#                                                    tLArr=tLArr,
-#                                                    textCorpus=textCorpus)
-            summand6 += gammaln(alphaF/numWordTypesActivatedInTopics[iteratingTopic]+topicsForWord)
-            summand6 -= gammaln(1.0 + topicsForWord)
+            summand8 += gammaln(alphaF/c_f(numWordTypesActivatedInTopics[iteratingTopic])+topicsForWord)
+            
+        summand8 += -gammaln(numWordTypesActivatedInTopics[iteratingTopic] \
+                            /c_f(numWordTypesActivatedInTopics[iteratingTopic]) + numWordsAssignedToTopic)
     
-    return summand1 + summand2 + summand3 + summand4 + summand5 + summand6
+    return summand1 + summand2 + summand3 + summand4 + summand5 + summand6 + summand7 + summand8
+
+
+
+def computeRelativeLogProbabilityForTZSimplified(activeTopics, textCorpus, wordType, topic, tLArr, zMat, 
+                                       gammas, wArr, alphaTheta, alphaF, 
+                                       numWordTypesActivatedInTopics, numTopicOccurencesInDoc,
+                                       numTopicAssignmentsToWordType,
+                                       c_theta = expr.c_theta_K,
+                                       c_f = expr.c_f_mj ):
+    # use only if no topic dies:
+    
+    # this check seems useless because it can never get false, but takes up quite some time..
+    if oneIfTopicAssignmentsSupported(textCorpus, tLArr, zMat)!=1:
+        return float("-inf")
+    
+    summand1 = zMat[wordType,topic] * math.log(1.0 - math.exp(-gammas[wordType]*wArr[topic]))
+    
+    summand2 = -(1-zMat[wordType,topic])*gammas[wordType]*wArr[topic]
+    
+    summand3 = 0.0 
+    for iteratingDoc in range(len(textCorpus)):
+        for iteratingTopic in activeTopics:
+            summand3 += gammaln(alphaTheta/c_theta(len(activeTopics)) + \
+                                numTopicOccurencesInDoc.get((iteratingDoc, iteratingTopic), 0.0))
+            summand3 -= gammaln(len(activeTopics)/c_theta(len(activeTopics))*alphaTheta + \
+                                numTopicOccurencesInDoc.get((iteratingDoc, iteratingTopic),0.0))
+    
+    summand4 = gammaln(numWordTypesActivatedInTopics[topic] \
+                       /  c_f(numWordTypesActivatedInTopics[topic])) * alphaF
+
+    summand5 = -numWordTypesActivatedInTopics[topic] \
+                    * gammaln(alphaF / c_f(numWordTypesActivatedInTopics[topic]))
+        
+    summand6 = 0.0
+    for iteratingTopic in activeTopics:
+        numWordsAssignedToTopic = 0.0
+        for r in range(numWordTypesActivatedInTopics[iteratingTopic]):
+            numWordsAssignedToTopic = +numTopicAssignmentsToWordType[(iteratingTopic, 
+                                                               getRthActiveWordTypeInTopic(
+                                                                            r=r, 
+                                                                            topic=iteratingTopic,
+                                                                            zMat=zMat))]
+
+        for r in range(numWordTypesActivatedInTopics[iteratingTopic]):
+            topicsForWord = numTopicAssignmentsToWordType[(iteratingTopic, 
+                                                               getRthActiveWordTypeInTopic(
+                                                                            r=r, 
+                                                                            topic=iteratingTopic,
+                                                                            zMat=zMat))]
+            summand6 += gammaln(alphaF/c_f(numWordTypesActivatedInTopics[iteratingTopic])+topicsForWord)
+            
+    summand7 = -gammaln(numWordTypesActivatedInTopics[iteratingTopic] \
+                        /c_f(numWordTypesActivatedInTopics[iteratingTopic]) + numWordsAssignedToTopic)
+    
+    return summand1 + summand2 + summand3 + summand4 + summand5 + summand6 + summand7
 
 
 def oneIfTopicAssignmentsSupported(textCorpus, tLArr, zMat, excludeDocWordPositions=[]):
@@ -426,43 +530,10 @@ def oneIfTopicAssignmentsSupported(textCorpus, tLArr, zMat, excludeDocWordPositi
                 return 0
     return 1
 
-def sampleTruncatedNumNewTopics(activeTopics, textCorpus, tLArr, alphaTheta, wordType,
-                                gammas, alpha, sigma, tau, numTopicOccurencesInDoc, cutoff=30):
-    
-    unnormalizedProbs = []
-    for kiPlus in range(cutoff):
-        kPlusKPlus = len(activeTopics) + kiPlus
-        
-        mainFactor1 = 1.0
-        
-        for iteratingDoc in range(len(textCorpus)):
-            factor1 = 1.0 / (math.gamma(alphaTheta/kPlusKPlus) ** len(activeTopics))
-    
-            numerator1 = math.gamma(alphaTheta)
-            
-            numerator2 = 1.0
-            
-            for j in activeTopics:
-                numerator2 *= math.gamma(alphaTheta/kPlusKPlus + \
-                                      numTopicOccurencesInDoc.get((iteratingDoc, j),0))
-                
-            denominator = math.gamma(len(textCorpus[iteratingDoc]) + alphaTheta )
-            
-            mainFactor1 *= factor1 * numerator1 * numerator2 / denominator
-            
-        lamPoisson = expr.psiTildeFunction(t=gammas[wordType], 
-                                    b=sum(gammas)-gammas[wordType],
-                                    alpha=alpha,
-                                    sigma=sigma,
-                                    tau=tau)
-        mainFactor2 = lamPoisson**kiPlus * math.exp(-lamPoisson) / math.factorial(kiPlus)
-        unnormalizedProbs.append(mainFactor1 * mainFactor2)
-    normalizer = sum(unnormalizedProbs)
-    normalizedProbs = [p / normalizer for p in unnormalizedProbs]
-    return np.nonzero(np.random.multinomial(1, normalizedProbs))[0][0]
 
 def sampleTruncatedNumNewTopicsLog(activeTopics, textCorpus, tLArr, alphaTheta, wordType,
-                                gammas, alpha, sigma, tau, numTopicOccurencesInDoc, cutoff=30):
+                                gammas, alpha, sigma, tau, numTopicOccurencesInDoc,
+                                c_theta=expr.c_theta_K, cutoff=30):
     
     logProbs = []
     k = len(activeTopics)
@@ -472,18 +543,18 @@ def sampleTruncatedNumNewTopicsLog(activeTopics, textCorpus, tLArr, alphaTheta, 
         mainSummand = 0.0
         
         for iteratingDoc in range(len(textCorpus)):
-            mainSummand += -k * gammaln(alphaTheta/kPlusKPlus)
+            mainSummand += -k * gammaln(alphaTheta/c_theta(kPlusKPlus))
             
-            mainSummand += gammaln(alphaTheta)
+            mainSummand += gammaln(kPlusKPlus/c_theta(kPlusKPlus)*alphaTheta)
             
             innerSum = 0.0
             for j in activeTopics:
                 innerSum += numTopicOccurencesInDoc.get((iteratingDoc, j),0)
 
-            mainSummand += -gammaln(innerSum + alphaTheta)
+            mainSummand += -gammaln(innerSum + kPlusKPlus/c_theta(kPlusKPlus)*alphaTheta)
             
             for topic in activeTopics:
-                mainSummand += gammaln(alphaTheta/kPlusKPlus + numTopicOccurencesInDoc.get((iteratingDoc, topic),0))
+                mainSummand += gammaln(alphaTheta/c_theta(kPlusKPlus) + numTopicOccurencesInDoc.get((iteratingDoc, topic),0))
         lamPoisson = expr.psiTildeFunction(t=gammas[wordType], 
                                     b=sum(gammas)-gammas[wordType],
                                     alpha=alpha,
@@ -520,7 +591,8 @@ def computeLMarginDistribution(textCorpus, gammas, zMat, uMat, activeTopics, alp
     return factor1 * factor2 * factor3
 
 def computeLogLikelihoodTWZ(activeTopics, textCorpus, tLArr, zMat, 
-                alphaTheta, alphaF, numWordTypesActivatedInTopics, numTopicOccurencesInDoc):
+                alphaTheta, alphaF, numWordTypesActivatedInTopics, 
+                numTopicOccurencesInDoc, c_theta=expr.c_theta_K, c_f=expr.c_f_mj):
     
     # this check seems useless because it can never get false, but takes up quite some time..
     #    if oneIfTopicAssignmentsSupported(textCorpus, tLArr, zMat)!=1:
@@ -528,20 +600,21 @@ def computeLogLikelihoodTWZ(activeTopics, textCorpus, tLArr, zMat,
     
     summand3 = 0.0
     for iteratingDoc in range(len(textCorpus)):
-        summand3 += gammaln(alphaTheta) - len(activeTopics)*gammaln(alphaTheta/len(activeTopics))
+        summand3 += gammaln(len(activeTopics)/c_theta(len(activeTopics))*alphaTheta) - len(activeTopics)*gammaln(alphaTheta/c_theta(len(activeTopics)))
         
-    summand4 = 0.0 
+    summand4 = 0.0
     for iteratingDoc in range(len(textCorpus)):
         for iteratingTopic in activeTopics:
-            summand4 += gammaln(alphaTheta/len(activeTopics) + \
+            summand4 += gammaln(alphaTheta/c_theta(len(activeTopics)) + \
                                 numTopicOccurencesInDoc.get((iteratingDoc, iteratingTopic), 0.0))
-            summand4 -= gammaln(alphaTheta + \
+            summand4 -= gammaln(len(activeTopics)/c_theta(len(activeTopics))*alphaTheta + \
                                 numTopicOccurencesInDoc.get((iteratingDoc, iteratingTopic),0.0))
         
     summand5 = 0.0
     for iteratingTopic in activeTopics:
-        summand5 += gammaln(alphaF) - numWordTypesActivatedInTopics[iteratingTopic] \
-                                * gammaln(alphaF / numWordTypesActivatedInTopics[iteratingTopic])
+        summand5 += gammaln(numWordTypesActivatedInTopics[iteratingTopic]/c_f(numWordTypesActivatedInTopics[iteratingTopic])*alphaF)\
+                             - numWordTypesActivatedInTopics[iteratingTopic] \
+                                * gammaln(alphaF / c_f(numWordTypesActivatedInTopics[iteratingTopic]))
 
     summand6 = 0.0
     for iteratingTopic in activeTopics:
@@ -554,9 +627,8 @@ def computeLogLikelihoodTWZ(activeTopics, textCorpus, tLArr, zMat,
                                                                             zMat=zMat), 
                                                     tLArr=tLArr,
                                                     textCorpus=textCorpus)
-            summand6 += gammaln(alphaF/numWordTypesActivatedInTopics[iteratingTopic]+topicsForWord)
-            summand6 -= gammaln(1.0 + topicsForWord)
+            summand6 += gammaln(alphaF/c_f(numWordTypesActivatedInTopics[iteratingTopic]+topicsForWord))
+            summand6 -= gammaln(numWordTypesActivatedInTopics[iteratingTopic]/c_f(numWordTypesActivatedInTopics[iteratingTopic]) + topicsForWord)
     
     return summand3 + summand4 + summand5 + summand6
-
 

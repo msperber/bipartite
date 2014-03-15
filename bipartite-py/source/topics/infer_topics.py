@@ -53,6 +53,8 @@ def inferTopicsCollapsedGibbs(textCorpus, hyperParameters, numIterations, numIni
             sample_alpha(samplingVariables, hyperParameters)
             sample_sigma(textCorpus, samplingVariables, hyperParameters)
             sample_tau(textCorpus, samplingVariables, hyperParameters)
+        
+        print "num topics:", len(samplingVariables.getActiveTopics())
 
         # bugcheck:
         samplingVariables.counts.assertConsistency(textCorpus, samplingVariables)

@@ -23,3 +23,6 @@ def psiTildeFunction(t, b, alpha, sigma, tau):
 
 def kappaFunction(n, z, alpha, sigma, tau):
     return (alpha / (z+tau)**(n-sigma)) * (math.gamma(n-sigma)/math.gamma(1.0-sigma)) # checked sv
+
+def c_f_mj(mj): return mj
+def c_theta_K(K): return K
