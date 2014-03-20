@@ -16,6 +16,9 @@ class TestUpdateGenerated(unittest.TestCase):
         return np.sum(samplingVariables.zMat / samplingVariables.zMat.shape[1])
     
     def test1(self):
+        random.seed(13)
+        np.random.seed(13)
+
         numGenerative, numSampling = 100, 100
         hyperParameters = HyperParameters(alpha=5.0, sigma=0.5, tau=1.0, alphaTheta=1.0, 
                                           alphaF=1.0, aGamma=1.0, bGamma=1.0)

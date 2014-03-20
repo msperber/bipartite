@@ -78,6 +78,7 @@ class GibbsSamplingVariables(object):
         for topic in self.activeTopics:
             if getNumWordTypesActivatedInTopic(topic, self.zMat)==0:
                 removingTopics.append(topic)
+        if len(removingTopics)>0: print "removingTopics:", removingTopics
         for topic in removingTopics:
             self.activeTopics.remove(topic)
         self.deadTopics.extend(removingTopics)
