@@ -55,7 +55,11 @@ def establernd(V0,alpha,tau,n):
                 U = gen_U(w1, w2, w3, gamma)
     
                 W = np.random.rand()
-                zeta = sqrt(ratio_B(U, alpha))
+                try:
+                    zeta = sqrt(ratio_B(U, alpha))
+                except ValueError:
+                    print "breakpoint"
+                    raise ValueError
                 z = 1.0/(1.0 - (1.0 + alpha*zeta/sqrt(gamma))**(-1.0/alpha))
 #                 print "lam_alpha ", lam_alpha , " zeta ", zeta , "\n"
 #                 print "T1 ",  pi * exp(-lam_alpha * (1.0-zeta**(-2.0))), "\n" 

@@ -67,7 +67,7 @@ class TestUpdateGenerated(unittest.TestCase):
         random.seed(13)
         np.random.seed(13)
 
-        numGenerative, numSampling = 100, 1000
+        numGenerative, numSampling = 100, 100
         hyperParameters = HyperParameters(alpha=5.0, sigma=0.5, tau=1.0, alphaTheta=1.0, 
                                           alphaF=1.0, aGamma=1.0, bGamma=1.0)
         vocabSize=5 
@@ -75,6 +75,7 @@ class TestUpdateGenerated(unittest.TestCase):
         numWordsPerDocument=5
         # run generative algorithm, average statistic
         baseStatistics = np.zeros(numDocuments * numWordsPerDocument+1)
+        updatedStatistics = np.zeros(numDocuments * numWordsPerDocument+1)
         for genIteration in range(numGenerative):
             samplingVariables = BipartiteTopicGenerator().generateTopics(
                                     vocabSize=vocabSize, 
@@ -84,16 +85,13 @@ class TestUpdateGenerated(unittest.TestCase):
             baseStatistics += \
                     self.numWordsAssignmentsToTopicHisto(samplingVariables) / float(numGenerative)
 
-        # first, we need to draw w & G*, as these are not produced by the generative algorithm
-        updateWGStar(samplingVariables.textCorpus, samplingVariables, hyperParameters)
-        # update t many times, based on most recently generated model
-        updatedStatistics = np.zeros(numDocuments * numWordsPerDocument+1)
-        for samplingIterating in range(numSampling):
-            updateTs(samplingVariables.textCorpus, samplingVariables, hyperParameters)
-            # compute same statistic & compare
+            # first, we need to draw w & G*, as these are not produced by the generative algorithm
+            updateWGStar(samplingVariables.textCorpus, samplingVariables, hyperParameters)
+            # update t many times, based on most recently generated model
+            for samplingIterating in range(numSampling):
+                updateTs(samplingVariables.textCorpus, samplingVariables, hyperParameters)
+                # compute same statistic & compare
             updatedStatistics += \
-                        self.numWordsAssignmentsToTopicHisto(samplingVariables) / float(numSampling)
-        updatedStatisticsFinalState = \
-                        self.numWordsAssignmentsToTopicHisto(samplingVariables)   
+                        self.numWordsAssignmentsToTopicHisto(samplingVariables) / float(numGenerative)
         
         self.assert_list_almost_equal(baseStatistics, updatedStatistics, 0.1)
