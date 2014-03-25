@@ -14,7 +14,12 @@ from nose.tools.nontrivial import nottest
 class TestUpdateGenerated(unittest.TestCase):
     
     def meanNumWordTypesActivatedPerTopic(self, samplingVariables):
-        return np.sum(samplingVariables.zMat / samplingVariables.zMat.shape[1])
+        return np.sum(samplingVariables.zMat) / samplingVariables.zMat.shape[1]
+    def numTopicsWithWordTypeActivated(self, samplingVariables, wordType):
+        num = 0.0
+        for topic in samplingVariables.activeTopics:
+            num += samplingVariables.zMat[ wordType , topic ]
+        return num
     def numWordsAssignmentsToTopicHisto(self, samplingVariables):
         histo = np.zeros(samplingVariables.textCorpus.getTotalNumWords()+1)
         wordsAssignedToTopicSets = [list() for _ in range(len(samplingVariables.getActiveTopics()))]
@@ -27,47 +32,53 @@ class TestUpdateGenerated(unittest.TestCase):
         assert_almost_equal(samplingVariables.textCorpus.getTotalNumWords(),
                             sum([histo[i]*i for i in range(len(histo))]))
         return histo
-    def assert_list_almost_equal(self, l1, l2, precision=1e-6):
+    def assert_list_almost_equal(self, l1, l2, decimal=6):
         assert len(l1)==len(l2)
         for i in range(len(l1)):
-            assert_almost_equal(l1[i], l2[i], precision)
+            assert_almost_equal(l1[i], l2[i], decimal)
      
-    @nottest
-    def ljhjtestZUpdates(self):
+    def testZUpdates(self):
         random.seed(13)
         np.random.seed(13)
 
-        numGenerative, numSampling = 100, 100
+        numGenerative, numSampling = 10, 100
         hyperParameters = HyperParameters(alpha=5.0, sigma=0.5, tau=1.0, alphaTheta=1.0, 
                                           alphaF=1.0, aGamma=1.0, bGamma=1.0)
         # run generative algorithm, average statistic
-        baseStatistic = 0.0
+        # statistic will contain avg. # topics with word 0 activate, and avg total # topics
+        baseStatistic, updatedStatistic = [0.0, 0.0], [0.0, 0.0]
         for genIteration in range(numGenerative):
             samplingVariables = BipartiteTopicGenerator().generateTopics(
                                     vocabSize=5, 
                                     numDocuments=3, 
                                     numWordsPerDocument=5, 
                                     hyperParameters=hyperParameters)
-            baseStatistic += \
-                    self.meanNumWordTypesActivatedPerTopic(samplingVariables) / float(numGenerative)
+            baseStatistic[0] += \
+                    self.numTopicsWithWordTypeActivated(samplingVariables, 0) / float(numGenerative)
+            baseStatistic[1] += \
+                    len(samplingVariables.activeTopics) / float(numGenerative)
 
-        # first, we need to draw w & G*, as these are not produced by the generative algorithm
-        updateWGStar(samplingVariables.textCorpus, samplingVariables, hyperParameters)
-        # update z many times, based on most recently generated model
-        for samplingIterating in range(numSampling):
-            updateZs(samplingVariables.textCorpus, samplingVariables, hyperParameters)
+            # first, we need to draw w & G*, as these are not produced by the generative algorithm
+            updateWGStar(samplingVariables.textCorpus, samplingVariables, hyperParameters)
+            # update z many times, based on most recently generated model
+            for samplingIterating in range(numSampling):
+                updateZs(samplingVariables.textCorpus, samplingVariables, hyperParameters,
+                         limitUpdatesToWordTypes=[0])
             
-        # compute same statistic & compare
-        updatedStatistic = \
-                    self.meanNumWordTypesActivatedPerTopic(samplingVariables) / float(numGenerative)
+            # compute same statistic & compare
+            updatedStatistic[0] += \
+                        self.numTopicsWithWordTypeActivated(samplingVariables, 0) / float(numGenerative)
+            updatedStatistic[1] += \
+                        len(samplingVariables.activeTopics) / float(numGenerative)
         
-        assert_almost_equal(baseStatistic, updatedStatistic)
+        print "baseStatistic, updatedStatistic:", baseStatistic, updatedStatistic
+        self.assert_list_almost_equal(baseStatistic, updatedStatistic, decimal=1)
 
-    def testTUpdates(self):
+    def _not_testTUpdates(self):
         random.seed(13)
         np.random.seed(13)
 
-        numGenerative, numSampling = 100, 100
+        numGenerative, numSampling = 100, 1000
         hyperParameters = HyperParameters(alpha=5.0, sigma=0.5, tau=1.0, alphaTheta=1.0, 
                                           alphaF=1.0, aGamma=1.0, bGamma=1.0)
         vocabSize=5 
@@ -86,7 +97,7 @@ class TestUpdateGenerated(unittest.TestCase):
                     self.numWordsAssignmentsToTopicHisto(samplingVariables) / float(numGenerative)
 
             # first, we need to draw w & G*, as these are not produced by the generative algorithm
-            updateWGStar(samplingVariables.textCorpus, samplingVariables, hyperParameters)
+#            updateWGStar(samplingVariables.textCorpus, samplingVariables, hyperParameters)
             # update t many times, based on most recently generated model
             for samplingIterating in range(numSampling):
                 updateTs(samplingVariables.textCorpus, samplingVariables, hyperParameters)

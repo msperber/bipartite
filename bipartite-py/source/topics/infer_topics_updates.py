@@ -37,11 +37,13 @@ def updateUs(textCorpus, samplingVariables):
                                          samplingVariables.wArr[iteratingTopic],
                                          1.0)
 
-def updateZs(textCorpus, samplingVariables, hyperParameters):
+def updateZs(textCorpus, samplingVariables, hyperParameters, limitUpdatesToWordTypes=None):
     """
     a Metropolis algorithm to update zMat's and tLArr's simultaneously 
     """
     for iteratingWordType in range(textCorpus.getVocabSize()):
+        if limitUpdatesToWordTypes is not None and iteratingWordType not in limitUpdatesToWordTypes:
+            continue
         for iteratingTopic in samplingVariables.getActiveTopics():
             # skip the case where only topic j is active for word i: we need at
             # least one topic in which each word is activated
@@ -398,7 +400,8 @@ def sampleTGivenZT(activeTopics, doc, wordPos, alphaTheta, alphaF, textCorpus, t
                                         numTopicAssignmentsToWordTypeDict=numTopicAssignmentsToWordType,
                                         excludeDocWordPositions=[(doc,wordPos)] + excludeDocWordPositions)
             summand1 = math.log(alphaTheta/c_theta(len(activeTopics)) + numTopicAssignmentsToDocCount)
-            summand2 = gammaln(alphaF/c_f(numWordTypesActivatedInTopics[iteratingTopic]) + numTopicAssignmentsToWordTypeCount + 1.0)
+            summand2 = math.log(alphaF/c_f(numWordTypesActivatedInTopics[iteratingTopic]) + numTopicAssignmentsToWordTypeCount)
+#            summand2 = gammaln(alphaF/c_f(numWordTypesActivatedInTopics[iteratingTopic]) + numTopicAssignmentsToWordTypeCount + 1.0)
             summand3 = -math.log(alphaF*numWordTypesActivatedInTopics[iteratingTopic]/c_f(numWordTypesActivatedInTopics[iteratingTopic]) \
                                  + sum([GibbsCounts.getNumTopicAssignmentsToWordTypeExcl(\
                                         wordType=getRthActiveWordTypeInTopic(r, iteratingTopic, zMat),
