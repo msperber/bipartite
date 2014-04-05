@@ -12,7 +12,21 @@ import source.expressions as expr
 import random
 import copy
 
-class GibbsSamplingVariables(object):
+
+class RevertableParent(object):
+    def getRevertableObjects(self):
+        pass
+    def activateRevertableChanges(self, value=True):
+        for obj in self.getRevertableObjects():
+            obj.activateRevertableChanges(value)
+    def revert(self):
+        for obj in self.getRevertableObjects():
+            obj.revert()
+    def makePermanent(self):
+        for obj in self.getRevertableObjects():
+            obj.makePermanent()
+
+class GibbsSamplingVariables(RevertableParent):
     
     def __init__(self, textCorpus, nTopics = 1, vocabSize=None):
         self.deadTopics, self.activeTopics = [], []
@@ -65,6 +79,9 @@ class GibbsSamplingVariables(object):
     
     def initCounts(self, textCorpus):
         self.counts = GibbsCounts(textCorpus, self)
+    
+    def getRevertableObjects(self):
+        return [self.counts, self.tLAr]
     
     # approach to managing active & dead topics: both are stored in (complementary) lists,
     # which are only changed upon a call of releaseDeadTopics() or createNewTopics()
@@ -193,7 +210,7 @@ class RevertableList(list):
     def activateRevertableChanges(self, value=True):
         self.activateRevertable=value
     
-class GibbsCounts(object):
+class GibbsCounts(object,RevertableParent):
     """
     Counts are implemented as pair-indexed dictionaries (for now).
     If the dictionary has no entry for some key, the corresponding value is meant to be 0 by 
@@ -205,7 +222,7 @@ class GibbsCounts(object):
         self.numTopicAssignmentsToWordType = RevertableSparseDict()
         self.numWordTypesActivatedInTopic = RevertableSparseDict()
         self.numActiveTopicsForWordType = RevertableSparseDict()
-        self.docWordPosListForTopicAssignments = RevertableSparseDict(defaultReturnValue=[])
+        self.docWordPosListForWordTypes = RevertableSparseDict(defaultReturnValue=[])
         for topic in samplingVariables.getActiveTopics():
             for docId in range(len(textCorpus)):
                 self.numTopicOccurencesInDoc[docId, topic] = \
@@ -225,10 +242,63 @@ class GibbsCounts(object):
         for docId in range(len(textCorpus)):
             for wordPos in range(len(textCorpus[docId])):
                 wordType = textCorpus[docId][wordPos]
-                assignedTopic = samplingVariables.tLArr[docId][wordPos]
-                if (wordType, assignedTopic) not in self.docWordPosListForTopicAssignments:
-                    self.docWordPosListForTopicAssignments[wordType, assignedTopic] = []
-                self.docWordPosListForTopicAssignments[wordType, assignedTopic].append((docId,wordPos))
+                if wordType not in self.docWordPosListForWordTypes:
+                    self.docWordPosListForWordTypes[wordType] = []
+                self.docWordPosListForWordTypes[wordType].append((docId,wordPos))
+    def updateChangeInT(self, docPos, wordPos, wordType, oldTopic, newTopic):
+        self.numTopicAssignmentsToWordType[ \
+                                wordType,
+                                oldTopic] \
+                        = self.numTopicAssignmentsToWordType.get(( \
+                                wordType,
+                                oldTopic),0) - 1
+        self.numTopicAssignmentsToWordType[ \
+                            wordType,
+                            newTopic] \
+                    = self.numTopicAssignmentsToWordType.get(( \
+                            wordType,
+                            newTopic), 0) + 1
+        self.numTopicOccurencesInDoc[docPos,oldTopic] = \
+                self.numTopicOccurencesInDoc.get((docPos,oldTopic),0) \
+                -1
+        self.numTopicOccurencesInDoc[docPos,newTopic] = \
+                self.numTopicOccurencesInDoc.get((docPos,newTopic),0) \
+                +1
+    def updateRevertableChangeInT(self, docPos, wordPos, wordType, oldTopic, newTopic):
+        self.numTopicAssignmentsToWordType.addRevertable(
+                (wordType,
+                 newTopic),
+                +1)
+        self.numTopicAssignmentsToWordType.addRevertable(
+                (wordType,
+                 oldTopic),
+                -1)
+
+        self.numTopicOccurencesInDoc.addRevertable((docPos, newTopic), + 1)
+        self.numTopicOccurencesInDoc.addRevertable((docPos, oldTopic), - 1)
+        
+    def updateChangeInZ(self, wordType, topic, oldVal, newVal):
+        if newVal==1:
+            self.numWordTypesActivatedInTopic[topic]=\
+                                                self.numWordTypesActivatedInTopic[topic]+1
+            self.numActiveTopicsForWordType[wordType]=\
+                                                self.numActiveTopicsForWordType[wordType]+1
+        else: 
+            self.numWordTypesActivatedInTopic[topic]=\
+                                                    self.numWordTypesActivatedInTopic[topic]-1
+            self.numActiveTopicsForWordType[wordType]=\
+                                                self.numActiveTopicsForWordType[wordType]-1
+    def updateRevertableChangeInZ(self, wordType, topic, oldVal, newVal):
+        if newVal==1:
+            self.numWordTypesActivatedInTopic.setRevertable(topic,
+                                                self.numWordTypesActivatedInTopic[topic]+1)
+            self.numActiveTopicsForWordType.setRevertable(wordType,
+                                                self.self.numActiveTopicsForWordType[wordType]+1)
+        else: 
+            self.numWordTypesActivatedInTopic.setRevertable(topic,
+                                                    self.numWordTypesActivatedInTopic[topic]-1)
+            self.numActiveTopicsForWordType.setRevertable(wordType,
+                                                self.self.numActiveTopicsForWordType[wordType]-1)
     def assertConsistency(self, textCorpus, samplingVariables):
         for topic in samplingVariables.getActiveTopics():
             for docId in range(len(textCorpus)):
@@ -246,6 +316,11 @@ class GibbsCounts(object):
             assert self.numActiveTopicsForWordType[wordType] == \
                     getNumActiveTopicsForWordType(wordType=wordType, zMat=samplingVariables.zMat, 
                                           activeTopics=samplingVariables.getActiveTopics())
+    def getRevertableObjects(self):
+        return [self.numTopicOccurencesInDoc, self.numTopicAssignmentsToWordType,
+                self.numWordTypesActivatedInTopic, self.numActiveTopicsForWordType,
+                self.docWordPosListForWordTypes]
+
     @staticmethod
     def getNumTopicAssignmentsToWordTypeExcl(wordType, topic, tLArr, textCorpus,
                                      numTopicAssignmentsToWordTypeDict, excludeDocWordPositions):
@@ -256,6 +331,19 @@ class GibbsCounts(object):
             if tLArr[doc][iteratingWordPos]==topic and textCorpus[doc][iteratingWordPos]==wordType:
                 exclSum += 1
         return numTopicAssignmentsToWordTypeDict.get((wordType,topic),0) - exclSum
+
+class RevertableParent(object):
+    def getRevertableObjects(self):
+        pass
+    def activateRevertableChanges(self, value=True):
+        for obj in self.getRevertableObjects():
+            obj.activateRevertableChanges(value)
+    def revert(self):
+        for obj in self.getRevertableObjects():
+            obj.revert()
+    def makePermanent(self):
+        for obj in self.getRevertableObjects():
+            obj.makePermanent()
 
 def getNumTopicOccurencesInDoc(topic, doc, tLArr,
                                     excludeDocWordPositions=[]):
