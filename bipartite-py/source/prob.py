@@ -47,7 +47,7 @@ def flipCoin(p):
     '''
     return True if random.random() < p else False
 
-def sampleFrom15(gammas, uxjList, mj, parameters):
+def sampleFrom15(gammas, uxjList, mj, parameters, curWordType=None):
     '''
         sample from distribution [Caron 2012, equation 15]
         
@@ -55,17 +55,21 @@ def sampleFrom15(gammas, uxjList, mj, parameters):
         uxjList: u's sampled so far, for all words before the current one
         mj: num words active in current topic
         parameters: should have a 'tau' and a 'sigma' field
+        curWordType: sample u belonging to this wordType; if not given, deduce from len(gammas)
     '''
-    assert len(gammas) == len(uxjList)+1
+    if curWordType is None:
+        curWordType=len(gammas) 
+        assert len(gammas) == len(uxjList)+1
     y = random.random()
     tau = parameters.tau
     sigma = parameters.sigma
-    sjn = sum([gammas[i]*uxjList[i] for i in range(len(gammas)-1)])
+    sjn = sum([gammas[i]*uxjList[i] for i in range(curWordType-1)])
     if -0.00001 < mj - sigma < 0.00001:
         return ((tau+sjn)/gammas[-1])*((1.0+(gammas[-1]/(tau+sjn)))**y - 1.0)
     else:
         return (1.0/gammas[-1])*(((tau+sjn)**(-mj+sigma)+y*((tau+sjn+gammas[-1])**(-mj+sigma)-(tau+sjn)**(-mj+sigma)))**(1.0/(-mj+sigma))-(tau+sjn))
-            
+
+
 #def sampleTExp1(lam):
 #    y=random.random()
 #    return -math.log(1-(1-math.exp(-lam))*y )/lam

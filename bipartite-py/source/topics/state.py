@@ -101,36 +101,64 @@ class GibbsSamplingVariables(RevertableParent):
         self.deadTopics.extend(removingTopics)
         return removingTopics
     
-    def createNewTopics(self, numNewTopics):
+    def preparePotentialNewTopic(self, activeForWord):
+        newTopic=None
+        if len(self.deadTopics)==0:
+            newTopic = len(self.activeTopics)
+            # expand zMat
+            newZ = np.zeros((self.zMat.shape[0], self.zMat.shape[1]+1))
+            newZ[0, activeForWord] = 1
+            newZ[:,:-1] = self.zMat
+            self.zMat = newZ
+            # expand uMat
+            newU = np.empty((self.uMat.shape[0], self.uMat.shape[1]+1))
+            for i in range(self.uMat.shape[0]):
+                newU[i,-1] = 0.5
+            newU[:,:-1] = self.uMat
+            self.uMat = newU
+            # expand wArr
+            newW = np.ones((self.wArr.shape[0]+1))
+            newW[:-1] = self.wArr
+            self.wArr = newW
+        else:
+            newTopic = self.deadTopics[0]
+            for i in range(self.zMat.shape[0]):
+                self.zMat[i,newTopic] = 1
+                self.uMat[i,newTopic] = 0.5
+            self.wArr[newTopic] = 1.0
+        return newTopic
+    
+    def createNewTopic(self, preparedPotentialTopicIndex=None):
         # to be on the safe side: init new zMat's with 1, new uMat's with 0.5, new wArr with 1
-        newTopics = []
-        for _ in range(numNewTopics):
-            if len(self.deadTopics)==0:
-                newTopic = len(self.activeTopics)
-                # expand zMat
-                newZ = np.ones((self.zMat.shape[0], self.zMat.shape[1]+1))
-                newZ[:,:-1] = self.zMat
-                self.zMat = newZ
-                # expand uMat
-                newU = np.empty((self.uMat.shape[0], self.uMat.shape[1]+1))
-                for i in range(self.uMat.shape[0]):
-                    newU[i,-1] = 0.5
-                newU[:,:-1] = self.uMat
-                self.uMat = newU
-                # expand wArr
-                newW = np.ones((self.wArr.shape[0]+1))
-                newW[:-1] = self.wArr
-                self.wArr = newW
-            else:
+        if len(self.deadTopics)==0 and preparedPotentialTopicIndex is None:
+            newTopic = len(self.activeTopics)
+            # expand zMat
+            newZ = np.ones((self.zMat.shape[0], self.zMat.shape[1]+1))
+            newZ[:,:-1] = self.zMat
+            self.zMat = newZ
+            # expand uMat
+            newU = np.empty((self.uMat.shape[0], self.uMat.shape[1]+1))
+            for i in range(self.uMat.shape[0]):
+                newU[i,-1] = 0.5
+            newU[:,:-1] = self.uMat
+            self.uMat = newU
+            # expand wArr
+            newW = np.ones((self.wArr.shape[0]+1))
+            newW[:-1] = self.wArr
+            self.wArr = newW
+        else:
+            if preparedPotentialTopicIndex is None:
                 newTopic = self.deadTopics.pop()
+            else:
+                newTopic = preparedPotentialTopicIndex
+                self.deadTopics.remove(newTopic)
                 for i in range(self.zMat.shape[0]):
                     self.zMat[i,newTopic] = 1
                     self.uMat[i,newTopic] = 0.5
                 self.wArr[newTopic] = 1.0
-            newTopics.append(newTopic)
-            self.activeTopics.append(newTopic)
-            
-        return newTopics
+        self.activeTopics.append(newTopic)
+        return newTopic
+        
     
     def removeTopic(self, topic):
         self.deadTopics.append(topic)

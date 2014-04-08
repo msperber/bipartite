@@ -19,7 +19,7 @@ from state import *
 from source.expressions import psiTildeFunction, kappaFunction, psiFunction
 from numpy.ma.testutils import assert_almost_equal
 from source.prob import flipCoin
-
+from source.topics.generate_topics import sampleNextU
 
 PROPOSE_CREATE, PROPOSE_ADD, PROPOSE_DELETE = 1, 2, 3
 
@@ -58,7 +58,7 @@ def proposeCreateAndAcceptOrReject(wordType, textCorpus, hyperParameters,samplin
                                                      alpha=hyperParameters.alpha, 
                                                      sigma=hyperParameters.sigma, 
                                                      tau=hyperParameters.tau)
-    logProbZGivenWGamma = computeLogProbZGivenWGamma(wordType=wordType, 
+    logProbZTildeGivenWGamma = computeLogProbZGivenWGamma(wordType=wordType, 
                                                      kiPlus=1,
                                                      zMat=samplingVariables.zMat, 
                                                      activeTopics=samplingVariables.getActiveTopics(), 
@@ -70,70 +70,127 @@ def proposeCreateAndAcceptOrReject(wordType, textCorpus, hyperParameters,samplin
     
     # draw new topic assignment proposal: re-draw all occurrences of wordType
     LQi = samplingVariables.counts.docWordPosListForWordTypes[wordType]
-    newTopic = createRevertableTopic()
-#    numWordTypesActivatedInTopics = samplingVariables.counts.numWordTypesActivatedInTopic
-#    numWordTypesActivatedInTopics.setRevertable(newTopic,
-#                                                    numWordTypesActivatedInTopics[newTopic]+1)
-#    numWordTypesActivatedInTopics.activateRevertableChanges()
-    drawRevertableTopicProposalsAndUpdateCounts(LQi=LQi, 
+    newTopic = samplingVariables.preparePotentialNewTopic(activeForWord=wordType)
+    samplingVariables.counts.updateRevertableChangeInZ(wordType, newTopic, 0, 1)
+    oldTopics = [samplingVariables.tLArr[docPos][wordPos] for (docPos,wordPos) in LQi]
+    samplingVariables.activateRevertableChanges()
+    logProbDrawingNewTopics = drawRevertableTopicProposalsAndUpdateCounts(LQi=LQi, 
                                                 samplingVariables=samplingVariables, 
                                                 hyperParameters=hyperParameters, 
                                                 textCorpus=textCorpus,
-                                 numWordTypesActivatedInTopics=numWordTypesActivatedInTopics)
-    
-    # compute logProbWoTTildeGivenZTilde and logProbWoTGivenZ
+                                                numWordTypesActivatedInTopics=\
+                                            samplingVariables.counts.numWordTypesActivatedInTopic)
+    newTopics = [samplingVariables.tLArr[docPos][wordPos] for (docPos,wordPos) in LQi]
+    samplingVariables.activateRevertableChanges(False)
+    logProbRevertingTopics = computeLogProbOfDrawingTopics(Qi=LQi, 
+                                                drawnTopics=oldTopics,
+                                                samplingVariables=samplingVariables, 
+                                                hyperParameters=hyperParameters, 
+                                                textCorpus=textCorpus,
+                                                numWordTypesActivatedInTopics=\
+                                            samplingVariables.counts.numWordTypesActivatedInTopic)
     samplingVariables.activateRevertableChanges()
     
+    # compute logProbWoTTildeGivenZTilde and logProbWoTGivenZ
+    logProbWoTTildeGivenZTilde = computeRelativeLogProbabilityForTZ(
+            activeTopics=samplingVariables.getActiveTopics() + [newTopic],
+            textCorpus=textCorpus, 
+            tLArr=samplingVariables.tLArr, 
+            zMat=samplingVariables.zMat,
+            gammas=samplingVariables.gammas, 
+            wArr=samplingVariables.wArr, 
+            alphaTheta=hyperParameters.alphaTheta, 
+            alphaF=hyperParameters.alphaF,
+            numWordTypesActivatedInTopics=samplingVariables.counts.numWordTypesActivatedInTopics,
+            numTopicOccurencesInDoc=samplingVariables.counts.numTopicOccurencesInDoc,
+            numTopicAssignmentsToWordType=samplingVariables.counts.numTopicAssignmentsToWordType)
+    samplingVariables.activateRevertableChanges(False)
+    logProbWoTGivenZ = computeRelativeLogProbabilityForTZ(
+            activeTopics=samplingVariables.getActiveTopics(),
+            textCorpus=textCorpus, 
+            tLArr=samplingVariables.tLArr, 
+            zMat=samplingVariables.zMat,
+            gammas=samplingVariables.gammas, 
+            wArr=samplingVariables.wArr, 
+            alphaTheta=hyperParameters.alphaTheta, 
+            alphaF=hyperParameters.alphaF,
+            numWordTypesActivatedInTopics=samplingVariables.counts.numWordTypesActivatedInTopics,
+            numTopicOccurencesInDoc=samplingVariables.counts.numTopicOccurencesInDoc,
+            numTopicAssignmentsToWordType=samplingVariables.counts.numTopicAssignmentsToWordType)
+   
     # compute probs of moving from Z to ZTilde and vice versa
     logQZToZTilde = math.log(proposalTypeProportions[PROPOSE_CREATE])
     logQZTildeToZ = math.log(proposalTypeProportions[PROPOSE_DELETE] \
                              * 1.0/(1.0+numActiveTopicsForWordType[wordType]))
     
     # compute probs of drawing topics t and t~
+    ratio = math.exp(  logProbZTildeGivenWGamma   - logProbZGivenWGamma \
+                     + logProbWoTTildeGivenZTilde - logProbWoTGivenZ \
+                     + logQZTildeToZ              - logQZToZTilde\
+                     + logProbWoTGivenZ           - logProbWoTTildeGivenZTilde)
+    if ratio >= 1 or flipCoin(ratio):
+        samplingVariables.makePermanent()
+        samplingVariables.createNewTopic(preparedPotentialTopicIndex=newTopic)
 
-def drawRevertableTopicProposalsAndUpdateCounts(LQi, samplingVariables, hyperParameters, textCorpus,
-                                 numWordTypesActivatedInTopics):
+        for iteratingWordType in range(len(textCorpus.getVocabSize())):
+            samplingVariables.uMat[iteratingWordType, newTopic] = \
+                            prob.sampleFrom15(samplingVariables.gammas[:iteratingWordType+1], 
+                                              samplingVariables.uMat[:iteratingWordType,newTopic],
+                                              1,
+                                              hyperParameters)
+    else:
+        samplingVariables.revert()
+        
+def drawRevertableTopicProposalsAndUpdateCounts(LQi, activeTopics, tLArr, zMat, counts, 
+                                                hyperParameters, textCorpus  ):
     jointLogProb = 0.0
     for r in range(len(LQi)):
         iteratingDoc, iteratingWordPos = LQi[r]
+        oldTopic=tLArr[iteratingDoc][iteratingWordPos]
         sampledTopic, logProb = sampleTGivenZT(
-                    activeTopics=samplingVariables.getActiveTopics(),
+                    activeTopics=activeTopics,
                     doc=iteratingDoc, 
                     wordPos=iteratingWordPos,
                     alphaTheta=hyperParameters.alphaTheta, 
                     alphaF=hyperParameters.alphaF,
                     textCorpus=textCorpus,
-                    tLArr=samplingVariables.tLArr,
-                    zMat=samplingVariables.zMat,
+                    tLArr=tLArr,
+                    zMat=zMat,
                     excludeDocWordPositions=LQi[r+1:],
-                    numWordTypesActivatedInTopics=numWordTypesActivatedInTopics,
-                    numTopicOccurencesInDoc=samplingVariables.counts.numTopicOccurencesInDoc,
-                    numTopicAssignmentsToWordType=\
-                                samplingVariables.counts.numTopicAssignmentsToWordType)
+                    numWordTypesActivatedInTopics=counts.numWordTypesActivatedInTopics,
+                    numTopicOccurencesInDoc=counts.numTopicOccurencesInDoc,
+                    numTopicAssignmentsToWordType=counts.numTopicAssignmentsToWordType)
         jointLogProb += logProb
-        samplingVariables.tLArr[iteratingDoc].setRevertable(iteratingWordPos, sampledTopic)
-        samplingVariables.tLArr.activateRevertableChanges()
-        # update counts
-        samplingVariables.counts.numTopicAssignmentsToWordType.addRevertable(
-                (textCorpus[iteratingDoc][iteratingWordPos],
-                 sampledTopic),
-                +1)
-        samplingVariables.tLArr.activateRevertableChanges(False)
-        samplingVariables.counts.numTopicAssignmentsToWordType.addRevertable(
-                (textCorpus[iteratingDoc][iteratingWordPos],
-                 sampledTopic),
-                -1)
-
-        samplingVariables.tLArr.activateRevertableChanges()
-        samplingVariables.counts.numTopicOccurencesInDoc.addRevertable((iteratingDoc,
-                                sampledTopic), + 1)
-        samplingVariables.tLArr.activateRevertableChanges(False)
-        samplingVariables.counts.numTopicOccurencesInDoc.addRevertable((iteratingDoc,
-                                sampledTopic), - 1)
-    samplingVariables.tLArr.activateRevertableChanges()
-    samplingVariables.counts.numTopicOccurencesInDoc.activateRevertableChanges()
-    samplingVariables.counts.numTopicAssignmentsToWordType.activateRevertableChanges()
+        tLArr[iteratingDoc].setRevertable(iteratingWordPos, sampledTopic)
+        tLArr.activateRevertableChanges()
+        
+        counts.updateRevertableChangeInT(docPos=iteratingDoc, wordPos=iteratingWordPos, 
+                                         wordType=textCorpus[iteratingDoc][iteratingWordPos], 
+                                         oldTopic=oldTopic, newTopic=sampledTopic)
     
+    return jointLogProb
+
+def computeLogProbOfDrawingTopics(LQi, drawnTopics, activeTopics, tLArr, zMat, counts, 
+                                                hyperParameters, textCorpus ):
+    assert len(LQi) == len(drawnTopics)
+    jointLogProb = 0.0
+    for r in range(len(LQi)):
+        iteratingDoc, iteratingWordPos = LQi[r]
+        drawnTopic=drawnTopics[r]
+        logProb = probDistributionTGivenZT(
+                    activeTopics=activeTopics,
+                    doc=iteratingDoc, 
+                    wordPos=iteratingWordPos,
+                    alphaTheta=hyperParameters.alphaTheta, 
+                    alphaF=hyperParameters.alphaF,
+                    textCorpus=textCorpus,
+                    tLArr=tLArr,
+                    zMat=zMat,
+                    excludeDocWordPositions=LQi[r+1:],
+                    numWordTypesActivatedInTopics=counts.numWordTypesActivatedInTopics,
+                    numTopicOccurencesInDoc=counts.numTopicOccurencesInDoc,
+                    numTopicAssignmentsToWordType=counts.numTopicAssignmentsToWordType)[drawnTopic]
+        jointLogProb += logProb
     return jointLogProb
 
 
@@ -173,6 +230,47 @@ def drawProposalTypeProportions(wordType, zMat, activeTopics):
 def drawProposalType(probs):
     vals = probs.values()
     return vals[int(np.nonzero(np.random.multinomial(1, [probs[v] for v in vals]))[0][0])]
+
+
+def computeRelativeLogProbabilityForTZ(activeTopics, textCorpus, tLArr, zMat, gammas, 
+                                       wArr, alphaTheta, alphaF, numWordTypesActivatedInTopics,
+                                       numTopicOccurencesInDoc, numTopicAssignmentsToWordType,
+                                       c_theta, c_f):
+#    # this check seems useless because it can never get false, but takes up quite some time..
+    if oneIfTopicAssignmentsSupported(textCorpus, tLArr, zMat)!=1:
+        return float("-inf")
+
+    K = len(activeTopics)
+    c_theta_K = c_theta(K)
+    
+    summand1 = 0.0
+    summand2 = 0.0
+    for iteratingDocPos in range(len(textCorpus)):
+        summand1 += gammaln(K/c_theta_K*alphaTheta)
+        summand1 -= K * gammaln(alphaTheta / c_theta_K)
+        
+        for iteratingTopic in activeTopics:
+            summand2 += gammaln(alphaTheta/c_theta_K + \
+                                numTopicOccurencesInDoc[iteratingDocPos, iteratingTopic])
+            summand2 -= gammaln(K/c_theta_K*alphaTheta + \
+                                numTopicOccurencesInDoc[iteratingDocPos, iteratingTopic])
+    summand3 = 0.0
+    summand4 = 0.0
+    summand5 = 0.0
+    for iteratingTopic in activeTopics:
+        mj = numWordTypesActivatedInTopics[iteratingTopic]
+        summand3 += gammaln(mj / c_f(mj) * alphaF)
+        summand3 -= mj * gammaln(alphaF / c_f(mj))
+        
+        for r in range(mj):
+            numWordsTypeTopicCoOccurences = numTopicAssignmentsToWordType[
+                    (getRthActiveWordTypeInTopic(r=r, topic=iteratingTopic, zMat=zMat),
+                     iteratingTopic)]
+            summand4 += gammaln(alphaF, c_f(mj) + numWordsTypeTopicCoOccurences)
+        numTopicOccurences = 0
+        for iteratingDocPos in range(len(textCorpus)):
+            numTopicOccurences += numTopicOccurencesInDoc[iteratingDocPos]
+        summand5 -= gammaln(mj / c_f(mj) + numTopicOccurences)
 
 def updateZs(textCorpus, samplingVariables, hyperParameters, limitUpdatesToWordTypes=None):
     """
