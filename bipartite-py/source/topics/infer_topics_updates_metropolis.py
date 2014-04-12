@@ -267,11 +267,15 @@ def proposeDeleteAndAcceptOrReject(wordType, textCorpus, hyperParameters, sampli
     K = len(samplingVariables.getActiveTopics())
     Ki = numActiveTopicsForWordType[wordType]
     logQZToZTilde = math.log(proposalTypeProportions[PROPOSE_DELETE] / K)
+    samplingVariables.activateRevertableChanges()
+    reversalProposalTypeProportions = drawProposalTypeProportions(wordType, samplingVariables.zMat, samplingVariables.getActiveTopics())
     if numWordTypesActivatedInTopic[wordType] == 1:
-        logQZTildeToZ = math.log(proposalTypeProportions[PROPOSE_CREATE])
-    else:
-        logQZTildeToZ = math.log(proposalTypeProportions[PROPOSE_ADD] / (K - Ki + 1))
-    
+        logQZTildeToZ = math.log(reversalProposalTypeProportions[PROPOSE_CREATE])
+    else: 
+        try:
+            logQZTildeToZ = math.log(reversalProposalTypeProportions[PROPOSE_ADD] / (K - Ki + 1))
+        except ValueError:
+            print "breakpoint"
     proposeAndAcceptOrReject(topic=deletedTopic, 
                              isNewTopic=False, 
                              isDeletingTopic=True,
