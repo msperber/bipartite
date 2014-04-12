@@ -31,7 +31,8 @@ def updateZs(textCorpus, samplingVariables, hyperParameters, limitUpdatesToWordT
     samplingVariables.counts.assertConsistency(textCorpus, samplingVariables)
 
     print "corpus: ", textCorpus
-    for iteratingWordType in range(textCorpus.getVocabSize()):
+    wordTypesOccuringInCorpus = textCorpus.getWordTypesOccuringInCorpus()
+    for iteratingWordType in wordTypesOccuringInCorpus:
         if limitUpdatesToWordTypes is not None and iteratingWordType not in limitUpdatesToWordTypes:
             continue
         proposalTypeProportions = drawProposalTypeProportions(wordType=iteratingWordType, 

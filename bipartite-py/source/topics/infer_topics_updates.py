@@ -156,7 +156,10 @@ def probDistributionTGivenZT(activeTopics, doc, wordPos, alphaTheta, alphaF, tex
             propProb2 = math.exp(summand1 + summand2 + summand3)
             unnormalizedTopicProbs2.append(propProb2)
     normalizer2 = sum(unnormalizedTopicProbs2)
-    normalizedTopicProbs2 = [p / normalizer2 for p in unnormalizedTopicProbs2]
+    try:
+        normalizedTopicProbs2 = [p / normalizer2 for p in unnormalizedTopicProbs2]
+    except ZeroDivisionError:
+        print "breakpoint"
     return normalizedTopicProbs2
     
 def sampleTGivenZT(activeTopics, doc, wordPos, alphaTheta, alphaF, textCorpus, tLArr, 

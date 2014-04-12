@@ -40,6 +40,12 @@ class DocumentCorpus(list):
             raise Exception("no vocab was specified")
         else:
             return self.vocab
+    def getWordTypesOccuringInCorpus(self):
+        wordTypes = set()
+        for doc in self:
+            for wordType in doc:
+                wordTypes.add(wordType)
+        return list(wordTypes)
     def getVocabSize(self):
         if self.vocabSize is not None:
             return self.vocabSize
