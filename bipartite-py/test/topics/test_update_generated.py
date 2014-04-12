@@ -9,6 +9,7 @@ import unittest
 
 from source.topics.generate_topics import *
 from source.topics.infer_topics_updates import *
+from source.topics.infer_topics_updates_metropolis import *
 from nose.tools.nontrivial import nottest
 
 class TestUpdateGenerated(unittest.TestCase):

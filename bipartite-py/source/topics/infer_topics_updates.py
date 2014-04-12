@@ -14,7 +14,7 @@ import copy
 from source.exptiltedstable import *
 from scipy.special import gammaln
 
-from state import *
+from source.topics.state import *
 from source.expressions import psiTildeFunction, kappaFunction, psiFunction
 from numpy.ma.testutils import assert_almost_equal
 

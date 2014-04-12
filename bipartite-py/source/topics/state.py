@@ -33,6 +33,7 @@ class GibbsSamplingVariables(RevertableParent):
         self.textCorpus = textCorpus
         self.allocateVars(textCorpus, nTopics, vocabSize=vocabSize)
         self.counts = None
+        self.revertableZChange = None
         
     def allocateVars(self, textCorpus, nTopics, vocabSize=None):
         if vocabSize is None:
@@ -81,7 +82,27 @@ class GibbsSamplingVariables(RevertableParent):
         self.counts = GibbsCounts(textCorpus, self)
     
     def getRevertableObjects(self):
-        return [self.counts, self.tLAr]
+        return [self.counts, self.tLArr]
+    def activateRevertableChanges(self, value=True):
+        if self.revertableZChange is not None:
+            if value:
+                self.zMat[self.revertableZChange[0], self.revertableZChange[1]] = self.revertableZChange[3]
+            else:
+                self.zMat[self.revertableZChange[0], self.revertableZChange[1]] = self.revertableZChange[2]
+        for obj in self.getRevertableObjects():
+            obj.activateRevertableChanges(value)
+    def revert(self):
+        if self.revertableZChange is not None:
+            self.zMat[self.revertableZChange[0], self.revertableZChange[1]] = self.revertableZChange[2]
+            self.revertableZChange = None
+        for obj in self.getRevertableObjects():
+            obj.revert()
+    def makePermanent(self):
+        if self.revertableZChange is not None:
+            self.zMat[self.revertableZChange[0], self.revertableZChange[1]] = self.revertableZChange[3]
+            self.revertableZChange = None
+        for obj in self.getRevertableObjects():
+            obj.makePermanent()
     
     # approach to managing active & dead topics: both are stored in (complementary) lists,
     # which are only changed upon a call of releaseDeadTopics() or createNewTopics()
@@ -100,11 +121,15 @@ class GibbsSamplingVariables(RevertableParent):
             self.activeTopics.remove(topic)
         self.deadTopics.extend(removingTopics)
         return removingTopics
-    
+    def revertableChangeInZ(self, wordType, topic, oldState, newState):
+        self.counts.updateRevertableChangeInZ(wordType, topic, oldState, newState)
+        self.revertableZChange = (wordType, topic, oldState, newState)
+        self.zMat[wordType,topic] = newState
     def preparePotentialNewTopic(self, activeForWord):
         newTopic=None
         if len(self.deadTopics)==0:
             newTopic = len(self.activeTopics)
+            self.deadTopics.append(newTopic)
             # expand zMat
             newZ = np.zeros((self.zMat.shape[0], self.zMat.shape[1]+1))
             newZ[0, activeForWord] = 1
@@ -238,7 +263,7 @@ class RevertableList(list):
     def activateRevertableChanges(self, value=True):
         self.activateRevertable=value
     
-class GibbsCounts(object,RevertableParent):
+class GibbsCounts(RevertableParent):
     """
     Counts are implemented as pair-indexed dictionaries (for now).
     If the dictionary has no entry for some key, the corresponding value is meant to be 0 by 
@@ -321,12 +346,12 @@ class GibbsCounts(object,RevertableParent):
             self.numWordTypesActivatedInTopic.setRevertable(topic,
                                                 self.numWordTypesActivatedInTopic[topic]+1)
             self.numActiveTopicsForWordType.setRevertable(wordType,
-                                                self.self.numActiveTopicsForWordType[wordType]+1)
+                                                self.numActiveTopicsForWordType[wordType]+1)
         else: 
             self.numWordTypesActivatedInTopic.setRevertable(topic,
                                                     self.numWordTypesActivatedInTopic[topic]-1)
             self.numActiveTopicsForWordType.setRevertable(wordType,
-                                                self.self.numActiveTopicsForWordType[wordType]-1)
+                                                self.numActiveTopicsForWordType[wordType]-1)
     def assertConsistency(self, textCorpus, samplingVariables):
         for topic in samplingVariables.getActiveTopics():
             for docId in range(len(textCorpus)):
