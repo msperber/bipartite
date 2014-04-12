@@ -12,7 +12,7 @@ from source.topics.infer_topics_updates import *
 from source.topics.infer_topics_updates_metropolis import *
 from nose.tools.nontrivial import nottest
 
-class TestUpdateGenerated(unittest.TestCase):
+class TestUpdateGenerated(): # unittest.TestCase):
     
     def meanNumWordTypesActivatedPerTopic(self, samplingVariables):
         return np.sum(samplingVariables.zMat) / samplingVariables.zMat.shape[1]
@@ -107,3 +107,6 @@ class TestUpdateGenerated(unittest.TestCase):
                         self.numWordsAssignmentsToTopicHisto(samplingVariables) / float(numGenerative)
         
         self.assert_list_almost_equal(baseStatistics, updatedStatistics, 0.1)
+
+if __name__ == "__main__":
+    sys.exit(TestUpdateGenerated().testZUpdates())

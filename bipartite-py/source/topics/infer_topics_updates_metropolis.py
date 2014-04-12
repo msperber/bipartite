@@ -28,6 +28,8 @@ def updateZs(textCorpus, samplingVariables, hyperParameters, limitUpdatesToWordT
     """
     a Metropolis algorithm to update zMat's and tLArr's simultaneously 
     """
+    samplingVariables.counts.assertConsistency(textCorpus, samplingVariables)
+
     for iteratingWordType in range(textCorpus.getVocabSize()):
         if limitUpdatesToWordTypes is not None and iteratingWordType not in limitUpdatesToWordTypes:
             continue
@@ -35,9 +37,8 @@ def updateZs(textCorpus, samplingVariables, hyperParameters, limitUpdatesToWordT
                                                           zMat=samplingVariables.zMat,
                                               activeTopics=samplingVariables.getActiveTopics())
         proposalType = drawProposalType(proposalTypeProportions)
+        print "proposalType:", proposalType
         
-        # remove dead topics
-        samplingVariables.releaseDeadTopics()
 
         if proposalType == PROPOSE_CREATE:
             proposeCreateAndAcceptOrReject(wordType=iteratingWordType, 
@@ -65,15 +66,7 @@ def updateZs(textCorpus, samplingVariables, hyperParameters, limitUpdatesToWordT
                                                 samplingVariables.counts.numActiveTopicsForWordType,
                                         numWordTypesActivatedInTopic=\
                                             samplingVariables.counts.numWordTypesActivatedInTopic)
-        # bugcheck:
-        try:
-            samplingVariables.counts.assertConsistency(textCorpus, samplingVariables)
-        except AssertionError:
-            print "breakpoint"
-            samplingVariables.counts.assertConsistency(textCorpus, samplingVariables)
-        assert oneIfTopicAssignmentsSupported(textCorpus, samplingVariables.tLArr, 
-                                              samplingVariables.zMat)==1
- 
+
 def proposeAndAcceptOrReject(topic, isNewTopic, isDeletingTopic, wordType, textCorpus, 
                              hyperParameters, samplingVariablesWithRevertableChanges,
                              proposalTypeProportions, numActiveTopicsForWordType,
@@ -173,6 +166,7 @@ def proposeAndAcceptOrReject(topic, isNewTopic, isDeletingTopic, wordType, textC
                      + logQZTildeToZ              - logQZToZTilde\
                      + logProbRevertingTopics     - logProbDrawingNewTopics)
     if ratio >= 1 or flipCoin(ratio):
+        print "accepted"
         samplingVariables.makePermanent()
         
         if isNewTopic:
@@ -185,8 +179,19 @@ def proposeAndAcceptOrReject(topic, isNewTopic, isDeletingTopic, wordType, textC
                                                   1,
                                                   hyperParameters)
     else:
+        print "rejected"
         samplingVariables.revert()
-        
+
+    
+    # bugcheck:
+    try:
+        samplingVariables.counts.assertConsistency(textCorpus, samplingVariables)
+    except AssertionError:
+        print "breakpoint"
+        samplingVariables.counts.assertConsistency(textCorpus, samplingVariables)
+    assert oneIfTopicAssignmentsSupported(textCorpus, samplingVariables.tLArr, 
+                                          samplingVariables.zMat)==1
+     
 def proposeCreateAndAcceptOrReject(wordType, textCorpus, hyperParameters, samplingVariables,
                                    proposalTypeProportions, numActiveTopicsForWordType):
 
@@ -271,6 +276,8 @@ def proposeDeleteAndAcceptOrReject(wordType, textCorpus, hyperParameters, sampli
                                             samplingVariables.counts.numWordTypesActivatedInTopic,
                              logQZToZTilde=logQZToZTilde, 
                              logQZTildeToZ=logQZTildeToZ)
+    # remove dead topics
+    samplingVariables.releaseDeadTopics()
 
 def drawTopicActiveForWordType(wordType, activeTopics, zMat, numActiveTopicsForWordType):
     r = random.randint(1, numActiveTopicsForWordType[wordType])

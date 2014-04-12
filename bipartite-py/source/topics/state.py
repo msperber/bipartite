@@ -148,8 +148,9 @@ class GibbsSamplingVariables(RevertableParent):
         else:
             newTopic = self.deadTopics[0]
             for i in range(self.zMat.shape[0]):
-                self.zMat[i,newTopic] = 1
+                self.zMat[i,newTopic] = 0
                 self.uMat[i,newTopic] = 0.5
+            self.zMat[activeForWord,newTopic] = 1
             self.wArr[newTopic] = 1.0
         return newTopic
     
@@ -174,13 +175,13 @@ class GibbsSamplingVariables(RevertableParent):
         else:
             if preparedPotentialTopicIndex is None:
                 newTopic = self.deadTopics.pop()
-            else:
-                newTopic = preparedPotentialTopicIndex
-                self.deadTopics.remove(newTopic)
                 for i in range(self.zMat.shape[0]):
                     self.zMat[i,newTopic] = 1
                     self.uMat[i,newTopic] = 0.5
                 self.wArr[newTopic] = 1.0
+            else:
+                newTopic = preparedPotentialTopicIndex
+                self.deadTopics.remove(newTopic)
         self.activeTopics.append(newTopic)
         return newTopic
         
