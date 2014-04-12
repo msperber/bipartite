@@ -253,10 +253,15 @@ def proposeAddAndAcceptOrReject(wordType, textCorpus, hyperParameters, samplingV
 def proposeDeleteAndAcceptOrReject(wordType, textCorpus, hyperParameters, samplingVariables,
                                    proposalTypeProportions, numActiveTopicsForWordType,
                                    numWordTypesActivatedInTopic):
+    if numActiveTopicsForWordType[wordType] <= 1.0001:
+        # there will be no valid deletion proposals
+        return
+    
     deletedTopic = drawTopicActiveForWordType(wordType=wordType, 
                                               activeTopics=samplingVariables.getActiveTopics(), 
                                               zMat=samplingVariables.zMat, 
                                               numActiveTopicsForWordType=numActiveTopicsForWordType)
+    
     samplingVariables.revertableChangeInZ(wordType, deletedTopic, 1, 0)
 
     K = len(samplingVariables.getActiveTopics())
