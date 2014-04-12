@@ -30,6 +30,7 @@ def updateZs(textCorpus, samplingVariables, hyperParameters, limitUpdatesToWordT
     """
     samplingVariables.counts.assertConsistency(textCorpus, samplingVariables)
 
+    print "corpus: ", textCorpus
     for iteratingWordType in range(textCorpus.getVocabSize()):
         if limitUpdatesToWordTypes is not None and iteratingWordType not in limitUpdatesToWordTypes:
             continue
@@ -38,7 +39,9 @@ def updateZs(textCorpus, samplingVariables, hyperParameters, limitUpdatesToWordT
                                               activeTopics=samplingVariables.getActiveTopics())
         proposalType = drawProposalType(proposalTypeProportions)
         print "proposalType:", proposalType
-        
+        print "t assignments:", samplingVariables.tLArr
+        print "active topics:", samplingVariables.getActiveTopics()
+        print "zMat:", samplingVariables.zMat
 
         if proposalType == PROPOSE_CREATE:
             proposeCreateAndAcceptOrReject(wordType=iteratingWordType, 
@@ -81,7 +84,7 @@ def proposeAndAcceptOrReject(topic, isNewTopic, isDeletingTopic, wordType, textC
     if isDeletingTopic and numWordTypesActivatedInTopic[topic]<1.001:
         newActiveTopics = list(originalActiveTopics)
         try:
-            del newActiveTopics[topic]
+            newActiveTopics.remove(topic)
         except IndexError:
             print "breakpoint"
     samplingVariables.activateRevertableChanges(False)
@@ -350,7 +353,7 @@ def computeLogProbOfDrawingTopics(LQi, drawnTopics, activeTopics, tLArr, zMat, c
                     excludeDocWordPositions=LQi[r+1:],
                     numWordTypesActivatedInTopics=counts.numWordTypesActivatedInTopic,
                     numTopicOccurencesInDoc=counts.numTopicOccurencesInDoc,
-                    numTopicAssignmentsToWordType=counts.numTopicAssignmentsToWordType)[drawnTopic]
+                    numTopicAssignmentsToWordType=counts.numTopicAssignmentsToWordType)[activeTopics.index(drawnTopic)]
         jointLogProb += logProb
     return jointLogProb
 
