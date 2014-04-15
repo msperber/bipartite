@@ -42,18 +42,21 @@ class TestUpdateGenerated(): # unittest.TestCase):
         random.seed(13)
         np.random.seed(13)
 
-        numGenerative, numSampling = 10, 100
+        numGenerative, numSampling = 100, 1000
         hyperParameters = HyperParameters(alpha=5.0, sigma=0.5, tau=1.0, alphaTheta=1.0, 
                                           alphaF=1.0, aGamma=1.0, bGamma=1.0)
         # run generative algorithm, average statistic
         # statistic will contain avg. # topics with word 0 activate, and avg total # topics
         baseStatistic, updatedStatistic = [0.0, 0.0], [0.0, 0.0]
         for genIteration in range(numGenerative):
-            samplingVariables = BipartiteTopicGenerator().generateTopics(
-                                    vocabSize=5, 
-                                    numDocuments=3, 
-                                    numWordsPerDocument=5, 
-                                    hyperParameters=hyperParameters)
+            try:
+                samplingVariables = BipartiteTopicGenerator().generateTopics(
+                                        vocabSize=5, 
+                                        numDocuments=3, 
+                                        numWordsPerDocument=5, 
+                                        hyperParameters=hyperParameters)
+            except NoTopicsException:
+                continue
             baseStatistic[0] += \
                     self.numTopicsWithWordTypeActivated(samplingVariables, 0) / float(numGenerative)
             baseStatistic[1] += \

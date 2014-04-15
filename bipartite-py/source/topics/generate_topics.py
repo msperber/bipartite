@@ -96,6 +96,8 @@ class BipartiteTopicGenerator(object):
 #            
         docs = DocumentCorpus(vocabSize=vocabSize)
         emptyWord = -1
+        if K[-1]==0:
+            raise NoTopicsException()
         for iteratingDocNo in range(numDocuments):
             docs.append(Document())
             for iteratingWordPos in range(numWordsPerDocument):
@@ -151,10 +153,15 @@ class BipartiteTopicGenerator(object):
         return np.random.dirichlet([alphaTheta/c_theta(numTopics) for _ in range(numTopics)], 1)[0]
     
     def drawTopicForWord(self, topicProportions):
-        return np.nonzero(np.random.multinomial(1, topicProportions, size=1))[1][0]
-    
+        try:
+            return np.nonzero(np.random.multinomial(1, topicProportions, size=1))[1][0]
+        except IndexError:
+            print "breakpoint"
     def drawWordFromTopic(self, wordDistribution):
         return np.nonzero(np.random.multinomial(1, wordDistribution, size=1))[1][0]
+
+class NoTopicsException(Exception):
+    pass
 
 #np.random.seed(15)
 #random.seed(15)
