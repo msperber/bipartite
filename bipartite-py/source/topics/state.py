@@ -34,6 +34,7 @@ class GibbsSamplingVariables(RevertableParent):
         self.allocateVars(textCorpus, nTopics, vocabSize=vocabSize)
         self.counts = None
         self.revertableZChange = None
+        self.revertableUChange = None
         
     def allocateVars(self, textCorpus, nTopics, vocabSize=None):
         if vocabSize is None:
@@ -89,18 +90,40 @@ class GibbsSamplingVariables(RevertableParent):
                 self.zMat[self.revertableZChange[0], self.revertableZChange[1]] = self.revertableZChange[3]
             else:
                 self.zMat[self.revertableZChange[0], self.revertableZChange[1]] = self.revertableZChange[2]
+        if self.revertableUChange is not None:
+            if value:
+                self.uMat[self.revertableUChange[0], self.revertableUChange[1]] = self.revertableUChange[3]
+            else:
+                self.uMat[self.revertableUChange[0], self.revertableUChange[1]] = self.revertableUChange[2]
+        if self.revertableWChange is not None:
+            if value:
+                self.wArr[self.revertableWChange[0]] = self.revertableUChange[2]
+            else:
+                self.wArr[self.revertableUChange[0]] = self.revertableUChange[1]
         for obj in self.getRevertableObjects():
             obj.activateRevertableChanges(value)
     def revert(self):
         if self.revertableZChange is not None:
             self.zMat[self.revertableZChange[0], self.revertableZChange[1]] = self.revertableZChange[2]
             self.revertableZChange = None
+        if self.revertableUChange is not None:
+            self.uMat[self.revertableUChange[0], self.revertableUChange[1]] = self.revertableUChange[2]
+            self.revertableUChange = None
+        if self.revertableWChange is not None:
+            self.wArr[self.revertableWChange[0]] = self.revertableUChange[1]
+            self.revertableWChange = None
         for obj in self.getRevertableObjects():
             obj.revert()
     def makePermanent(self):
         if self.revertableZChange is not None:
             self.zMat[self.revertableZChange[0], self.revertableZChange[1]] = self.revertableZChange[3]
             self.revertableZChange = None
+        if self.revertableUChange is not None:
+            self.uMat[self.revertableUChange[0], self.revertableUChange[1]] = self.revertableUChange[3]
+            self.revertableUChange = None
+        if self.revertableWChange is not None:
+            self.wArr[self.revertableWChange[0]] = self.revertableUChange[2]
+            self.revertableWChange = None
         for obj in self.getRevertableObjects():
             obj.makePermanent()
     
@@ -121,10 +144,16 @@ class GibbsSamplingVariables(RevertableParent):
             self.activeTopics.remove(topic)
         self.deadTopics.extend(removingTopics)
         return removingTopics
-    def revertableChangeInZ(self, wordType, topic, oldState, newState):
-        self.counts.updateRevertableChangeInZ(wordType, topic, oldState, newState)
-        self.revertableZChange = (wordType, topic, oldState, newState)
-        self.zMat[wordType,topic] = newState
+    def revertableChangeInZ(self, wordType, topic, oldZ, newZ):
+        self.counts.updateRevertableChangeInZ(wordType, topic, oldZ, newZ)
+        self.revertableZChange = (wordType, topic, oldZ, newZ)
+        self.zMat[wordType,topic] = newZ
+    def revertableChangeInU(self, wordType, topic, oldU, newU):
+        self.revertableUChange = (wordType, topic, oldU, newU)
+        self.uMat[wordType,topic] = newU
+    def revertableChangeInW(self, topic, oldW, newW):
+        self.revertableWChange = (topic, oldW, newW)
+        self.wArr[topic] = newW
     def preparePotentialNewTopic(self, activeForWord):
         newTopic=None
         if len(self.deadTopics)==0:

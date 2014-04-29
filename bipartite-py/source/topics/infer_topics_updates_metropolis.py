@@ -44,7 +44,7 @@ def updateZs(textCorpus, samplingVariables, hyperParameters, limitUpdatesToWordT
         print "active topics:", samplingVariables.getActiveTopics()
         print "zMat:", samplingVariables.zMat
 
-        if proposalType == PROPOSE_CREATE:
+        if proposalType == PROPOSE_CREATE: # draw new u
             proposeCreateAndAcceptOrReject(wordType=iteratingWordType, 
                                            textCorpus=textCorpus, 
                                            hyperParameters=hyperParameters,
@@ -52,7 +52,7 @@ def updateZs(textCorpus, samplingVariables, hyperParameters, limitUpdatesToWordT
                                            proposalTypeProportions=proposalTypeProportions, 
                                            numActiveTopicsForWordType=\
                                                 samplingVariables.counts.numActiveTopicsForWordType)
-        elif proposalType == PROPOSE_ADD:
+        elif proposalType == PROPOSE_ADD: # draw u<1
             proposeAddAndAcceptOrReject(wordType=iteratingWordType, 
                                         textCorpus=textCorpus, 
                                         hyperParameters=hyperParameters,
@@ -60,7 +60,7 @@ def updateZs(textCorpus, samplingVariables, hyperParameters, limitUpdatesToWordT
                                         proposalTypeProportions=proposalTypeProportions, 
                                         numActiveTopicsForWordType=\
                                                 samplingVariables.counts.numActiveTopicsForWordType)
-        if proposalType == PROPOSE_DELETE:
+        if proposalType == PROPOSE_DELETE: # set u=1
             proposeDeleteAndAcceptOrReject(wordType=iteratingWordType, 
                                         textCorpus=textCorpus, 
                                         hyperParameters=hyperParameters,
@@ -84,10 +84,7 @@ def proposeAndAcceptOrReject(topic, isNewTopic, isDeletingTopic, wordType, textC
         newActiveTopics = originalActiveTopics + [topic]
     if isDeletingTopic and numWordTypesActivatedInTopic[topic]<1.001:
         newActiveTopics = list(originalActiveTopics)
-        try:
-            newActiveTopics.remove(topic)
-        except IndexError:
-            print "breakpoint"
+        newActiveTopics.remove(topic)
     samplingVariables.activateRevertableChanges(False)
     logProbZGivenWGamma = computeLogProbZGivenWGamma(wordType=wordType, 
                                                      kiPlus=0,
@@ -176,23 +173,20 @@ def proposeAndAcceptOrReject(topic, isNewTopic, isDeletingTopic, wordType, textC
         if isNewTopic:
             samplingVariables.createNewTopic(preparedPotentialTopicIndex=topic)
     
-            for iteratingWordType in range(textCorpus.getVocabSize()):
-                samplingVariables.uMat[iteratingWordType, topic] = \
-                                prob.sampleFrom15(samplingVariables.gammas[:iteratingWordType+1], 
-                                                  samplingVariables.uMat[:iteratingWordType,topic],
-                                                  1,
-                                                  hyperParameters)
+            # became unnecessary with the new u-based MH algo
+#            for iteratingWordType in range(textCorpus.getVocabSize()):
+#                samplingVariables.uMat[iteratingWordType, topic] = \
+#                                prob.sampleFrom15(samplingVariables.gammas[:iteratingWordType+1], 
+#                                                  samplingVariables.uMat[:iteratingWordType,topic],
+#                                                  1,
+#                                                  hyperParameters)
     else:
         print "rejected"
         samplingVariables.revert()
 
     
     # bugcheck:
-    try:
-        samplingVariables.counts.assertConsistency(textCorpus, samplingVariables)
-    except AssertionError:
-        print "breakpoint"
-        samplingVariables.counts.assertConsistency(textCorpus, samplingVariables)
+    samplingVariables.counts.assertConsistency(textCorpus, samplingVariables)
     assert oneIfTopicAssignmentsSupported(textCorpus, samplingVariables.tLArr, 
                                           samplingVariables.zMat)==1
      
@@ -200,7 +194,14 @@ def proposeCreateAndAcceptOrReject(wordType, textCorpus, hyperParameters, sampli
                                    proposalTypeProportions, numActiveTopicsForWordType):
 
     newTopic = samplingVariables.preparePotentialNewTopic(activeForWord=wordType)
-    samplingVariables.revertableChangeInZ(wordType, newTopic, 0, 1)
+
+    newU = 0 # TODO: draw new u
+    oldU = 1 # any value will do
+    newW = 0 # TODO: draw new u
+    
+    samplingVariables.revertableChangeInZ(wordType, newTopic, oldZ=0, newZ=1)
+    samplingVariables.revertableChangeInU(wordType, newTopic, oldU=oldU, newU=newU)
+    samplingVariables.revertableChangeInW(newTopic, oldW=1, newW=newW)
 
     # compute probs of moving from Z to ZTilde and vice versa
     logQZToZTilde = math.log(proposalTypeProportions[PROPOSE_CREATE])
@@ -228,7 +229,9 @@ def proposeAddAndAcceptOrReject(wordType, textCorpus, hyperParameters, samplingV
                                               activeTopics=samplingVariables.getActiveTopics(), 
                                               zMat=samplingVariables.zMat, 
                                               numActiveTopicsForWordType=numActiveTopicsForWordType)
-    samplingVariables.revertableChangeInZ(wordType, addedTopic, 0, 1)
+    newU = 0 # TODO: draw new u
+    samplingVariables.revertableChangeInZ(wordType, addedTopic, oldZ=0, newZ=1)
+    samplingVariables.revertableChangeInU(wordType, addedTopic, oldU=1, newU=newU)
     
     # compute probs of moving from Z to ZTilde and vice versa
     K = len(samplingVariables.getActiveTopics())
@@ -262,7 +265,9 @@ def proposeDeleteAndAcceptOrReject(wordType, textCorpus, hyperParameters, sampli
                                               zMat=samplingVariables.zMat, 
                                               numActiveTopicsForWordType=numActiveTopicsForWordType)
     
-    samplingVariables.revertableChangeInZ(wordType, deletedTopic, 1, 0)
+    oldU = samplingVariables.uMat[wordType,deletedTopic]
+    samplingVariables.revertableChangeInZ(wordType, deletedTopic, oldZ=1, newZ=0)
+    samplingVariables.revertableChangeInU(wordType, deletedTopic, oldU=oldU, newU=1)
 
     K = len(samplingVariables.getActiveTopics())
     Ki = numActiveTopicsForWordType[wordType]
@@ -272,10 +277,7 @@ def proposeDeleteAndAcceptOrReject(wordType, textCorpus, hyperParameters, sampli
     if numWordTypesActivatedInTopic[wordType] == 1:
         logQZTildeToZ = math.log(reversalProposalTypeProportions[PROPOSE_CREATE])
     else: 
-        try:
-            logQZTildeToZ = math.log(reversalProposalTypeProportions[PROPOSE_ADD] / (K - Ki + 1))
-        except ValueError:
-            print "breakpoint"
+        logQZTildeToZ = math.log(reversalProposalTypeProportions[PROPOSE_ADD] / (K - Ki + 1))
     proposeAndAcceptOrReject(topic=deletedTopic, 
                              isNewTopic=False, 
                              isDeletingTopic=True,
@@ -303,10 +305,7 @@ def drawTopicActiveForWordType(wordType, activeTopics, zMat, numActiveTopicsForW
     return activeTopics[index]
     
 def drawTopicInactiveForWordType(wordType, activeTopics, zMat, numActiveTopicsForWordType):
-    try:
-        r = random.randint(1, len(activeTopics) - numActiveTopicsForWordType[wordType])
-    except ValueError:
-        print "breakpoint"
+    r = random.randint(1, len(activeTopics) - numActiveTopicsForWordType[wordType])
     cnt = 0
     index = -1
     while cnt < r:
@@ -435,10 +434,7 @@ def computeRelativeLogProbabilityForTWoGivenZ(activeTopics, textCorpus, tLArr, z
     summand5 = 0.0
     for iteratingTopic in activeTopics:
         mj = numWordTypesActivatedInTopics[iteratingTopic]
-        try:
-            summand3 += gammaln(mj / c_f(mj) * alphaF)
-        except ZeroDivisionError:
-            print "breakpoint"
+        summand3 += gammaln(mj / c_f(mj) * alphaF)
         summand3 -= mj * gammaln(alphaF / c_f(mj))
         
         for r in range(mj):
