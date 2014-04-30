@@ -197,7 +197,11 @@ def proposeCreateAndAcceptOrReject(wordType, textCorpus, hyperParameters, sampli
 
     newU = 0 # TODO: draw new u
     oldU = 1 # any value will do
-    newW = 0 # TODO: draw new u
+    gammaSum = sum([samplingVariables.gammas[i] \
+               for i in range(textCorpus.getVocabSize()) if i!=wordType])
+    gammaSum += samplingVariables.gammas[wordType] * newU 
+    newW = np.random.gamma(1 - hyperParameters.sigma,
+                           1.0/(hyperParameters.tau+gammaSum)) 
     
     samplingVariables.revertableChangeInZ(wordType, newTopic, oldZ=0, newZ=1)
     samplingVariables.revertableChangeInU(wordType, newTopic, oldU=oldU, newU=newU)
