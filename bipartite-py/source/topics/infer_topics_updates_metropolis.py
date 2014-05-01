@@ -86,7 +86,8 @@ def proposeAndAcceptOrReject(topic, isNewTopic, isDeletingTopic, wordType, textC
         newActiveTopics = list(originalActiveTopics)
         newActiveTopics.remove(topic)
     samplingVariables.activateRevertableChanges(False)
-    logProbWUGamma = computeLogProbWUGamma(wordType=wordType,
+    logProbWUGamma = computeLogProbWUGamma(kiPlus=kiPlus,
+                                           wordType=wordType,
                                                 textCorpus=textCorpus, 
                                                 hyperParameters=hyperParameters,
                                                 gammas=samplingVariables.gammas, 
@@ -97,7 +98,8 @@ def proposeAndAcceptOrReject(topic, isNewTopic, isDeletingTopic, wordType, textC
                  numWordTypesActivatedInTopic=samplingVariables.counts.numActiveTopicsForWordType)
     
     samplingVariables.activateRevertableChanges()
-    logProbWUGammaTilde = computeLogProbWUGamma(wordType=wordType, 
+    logProbWUGammaTilde = computeLogProbWUGamma(kiPlus=kiPlus,
+                                                wordType=wordType, 
                                                 textCorpus=textCorpus, 
                                                 uMat=samplingVariables.uMat, 
                                                 activeTopics=originalActiveTopics, 
@@ -406,12 +408,16 @@ def computeLogProbOfDrawingTopics(LQi, drawnTopics, activeTopics, tLArr, zMat, c
         jointLogProb += logProb
     return jointLogProb
 
-def computeLogProbWUGamma(wordType, textCorpus, hyperParameters, gammas, wArr, uMat,  activeTopics,
-                          numActiveTopicsForWordType, numWordTypesActivatedInTopic):
+def computeLogProbWUGamma(kiPlus, wordType, textCorpus, hyperParameters, gammas, wArr, uMat,  
+                          activeTopics, numActiveTopicsForWordType, numWordTypesActivatedInTopic):
     logProbWUGamma = 0.0
     for iteratingWordType in range(textCorpus.getVocabSize()):
-        logProbWUGamma += numActiveTopicsForWordType[wordType]\
-                            * math.log(gammas[iteratingWordType])
+        if iteratingWordType==wordType:
+            logProbWUGamma += (numActiveTopicsForWordType[wordType] + kiPlus)\
+                                * math.log(gammas[iteratingWordType])
+        else:
+            logProbWUGamma += numActiveTopicsForWordType[wordType]\
+                                * math.log(gammas[iteratingWordType])
     for iteratingTopic in activeTopics:
         logProbWUGamma += numWordTypesActivatedInTopic[iteratingTopic]\
                             * math.log(wArr[iteratingTopic])

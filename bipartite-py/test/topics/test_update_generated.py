@@ -42,7 +42,7 @@ class TestUpdateGenerated(): # unittest.TestCase):
         random.seed(13)
         np.random.seed(13)
 
-        numGenerative, numSampling = 100, 1000
+        numGenerative, numSampling = 10, 100
         hyperParameters = HyperParameters(alpha=5.0, sigma=0.5, tau=1.0, alphaTheta=1.0, 
                                           alphaF=1.0, aGamma=1.0, bGamma=1.0)
         # run generative algorithm, average statistic

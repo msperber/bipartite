@@ -35,6 +35,7 @@ class GibbsSamplingVariables(RevertableParent):
         self.counts = None
         self.revertableZChange = None
         self.revertableUChange = None
+        self.revertableWChange = None
         
     def allocateVars(self, textCorpus, nTopics, vocabSize=None):
         if vocabSize is None:
