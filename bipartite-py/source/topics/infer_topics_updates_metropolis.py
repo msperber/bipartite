@@ -196,7 +196,10 @@ def proposeCreateAndAcceptOrReject(wordType, textCorpus, hyperParameters, sampli
 
     newTopic = samplingVariables.preparePotentialNewTopic(activeForWord=wordType)
 
-    newU = 0 # TODO: draw new u
+    newU = prob.sampleFrom15(gammas=[samplingVariables.gammas[wordType]], 
+                             uxjList=[], 
+                             mj=1, 
+                             parameters=hyperParameters)
     oldU = 1 # any value will do
     gammaUSum = sum([samplingVariables.gammas[i] \
                for i in range(textCorpus.getVocabSize()) if i!=wordType])
@@ -238,7 +241,11 @@ def proposeAddAndAcceptOrReject(wordType, textCorpus, hyperParameters, samplingV
                                               activeTopics=samplingVariables.getActiveTopics(), 
                                               zMat=samplingVariables.zMat, 
                                               numActiveTopicsForWordType=numActiveTopicsForWordType)
-    newU = 0 # TODO: draw new u
+    newU = prob.sampleFrom15(gammas=samplingVariables.gammas, 
+                             uxjList=samplingVariables.uMat[:wordType,addedTopic], 
+                             mj=samplingVariables.counts.numWordTypesActivatedInTopic[addedTopic]+1, 
+                             parameters=hyperParameters,
+                             curWordType=wordType)
     samplingVariables.revertableChangeInZ(wordType, addedTopic, oldZ=0, newZ=1)
     samplingVariables.revertableChangeInU(wordType, addedTopic, oldU=1, newU=newU)
     samplingVariables.activateRevertableChanges(False)
