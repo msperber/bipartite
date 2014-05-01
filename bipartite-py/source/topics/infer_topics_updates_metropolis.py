@@ -39,6 +39,7 @@ def updateZs(textCorpus, samplingVariables, hyperParameters, limitUpdatesToWordT
                                                           zMat=samplingVariables.zMat,
                                               activeTopics=samplingVariables.getActiveTopics())
         proposalType = drawProposalType(proposalTypeProportions)
+        print "proposalTypeProportions:", proposalTypeProportions
         print "proposalType:", proposalType
         print "t assignments:", samplingVariables.tLArr
         print "active topics:", samplingVariables.getActiveTopics()
@@ -86,7 +87,7 @@ def proposeAndAcceptOrReject(topic, isNewTopic, isDeletingTopic, wordType, textC
         newActiveTopics = list(originalActiveTopics)
         newActiveTopics.remove(topic)
     samplingVariables.activateRevertableChanges(False)
-    logProbWUGamma = computeLogProbWUGamma(kiPlus=kiPlus,
+    logProbWUGamma = computeLogProbWUGamma(kiPlus=0,
                                            wordType=wordType,
                                                 textCorpus=textCorpus, 
                                                 hyperParameters=hyperParameters,
@@ -248,25 +249,31 @@ def proposeAddAndAcceptOrReject(wordType, textCorpus, hyperParameters, samplingV
                              mj=samplingVariables.counts.numWordTypesActivatedInTopic[addedTopic]+1, 
                              parameters=hyperParameters,
                              curWordType=wordType)
+    gammaUSum = sum([samplingVariables.gammas[i]*samplingVariables.uMat[i,addedTopic] \
+               for i in range(textCorpus.getVocabSize()) if i!=wordType])
+    gammaUSum += samplingVariables.gammas[wordType] * newU 
+    newW = np.random.gamma(1 - hyperParameters.sigma,
+                           1.0/(hyperParameters.tau+gammaUSum)) 
     samplingVariables.revertableChangeInZ(wordType, addedTopic, oldZ=0, newZ=1)
     samplingVariables.revertableChangeInU(wordType, addedTopic, oldU=1, newU=newU)
-    samplingVariables.activateRevertableChanges(False)
     
     # compute probs of moving from Z to ZTilde and vice versa
     K = len(samplingVariables.getActiveTopics())
     Ki = numActiveTopicsForWordType[wordType]
-    curW = samplingVariables.wArr[addedTopic]
     gammaUSum = sum([samplingVariables.gammas[i]*samplingVariables.uMat[i,addedTopic] \
                for i in range(textCorpus.getVocabSize()) if i!=wordType])
     gammaUSum += samplingVariables.gammas[wordType]*newU
+    print "K:", K
+    print "Ki:", Ki
+    samplingVariables.activateRevertableChanges()
     logQiUToUTilde = math.log(proposalTypeProportions[PROPOSE_ADD] / (K - Ki)\
-                              *expr.lambdaFunction(curW, hyperParameters.alpha, 
+                              *expr.lambdaFunction(newW, hyperParameters.alpha, 
                                                   hyperParameters.sigma, hyperParameters.tau)\
-                             *(curW**samplingVariables.counts.numWordTypesActivatedInTopic[addedTopic]+1)\
-                             *math.exp(-curW*gammaUSum))
-    logQiUTildeToU = math.log(proposalTypeProportions[PROPOSE_DELETE] / (Ki + 1))
+                             *(newW**samplingVariables.counts.numWordTypesActivatedInTopic[addedTopic]+1)\
+                             *math.exp(-newW*gammaUSum))
+    reversalProposalTypeProportions = drawProposalTypeProportions(wordType, samplingVariables.zMat, samplingVariables.getActiveTopics())
+    logQiUTildeToU = math.log(reversalProposalTypeProportions[PROPOSE_DELETE] / (Ki + 1))
 
-    samplingVariables.activateRevertableChanges(True)
     proposeAndAcceptOrReject(topic=addedTopic, 
                              isNewTopic=False, 
                              isDeletingTopic=False,
@@ -457,6 +464,8 @@ def logPoissonPsiFunc(kiPlus, wordType, gammas, alpha, sigma, tau):
   
     
 def drawProposalTypeProportions(wordType, zMat, activeTopics):
+    print "getNumActiveTopicsForWordType(wordType, zMat, activeTopics):", getNumActiveTopicsForWordType(wordType, zMat, activeTopics)
+    print "len(activeTopics)", len(activeTopics)
     if getNumActiveTopicsForWordType(wordType, zMat, activeTopics) < len(activeTopics):
         return {PROPOSE_CREATE: 1.0/3, 
                 PROPOSE_ADD:    1.0/3, 

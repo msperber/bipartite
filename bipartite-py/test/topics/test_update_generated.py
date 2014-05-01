@@ -76,7 +76,7 @@ class TestUpdateGenerated(): # unittest.TestCase):
                         len(samplingVariables.activeTopics) / float(numGenerative)
         
         print "baseStatistic, updatedStatistic:", baseStatistic, updatedStatistic
-        self.assert_list_almost_equal(baseStatistic, updatedStatistic, decimal=1)
+        self.assert_list_almost_equal(updatedStatistic, baseStatistic, decimal=1)
 
     def _not_testTUpdates(self):
         random.seed(13)

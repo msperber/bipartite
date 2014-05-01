@@ -168,7 +168,7 @@ class GibbsSamplingVariables(RevertableParent):
             # expand uMat
             newU = np.empty((self.uMat.shape[0], self.uMat.shape[1]+1))
             for i in range(self.uMat.shape[0]):
-                newU[i,-1] = 0.5
+                newU[i,-1] = 1.0
             newU[:,:-1] = self.uMat
             self.uMat = newU
             # expand wArr
