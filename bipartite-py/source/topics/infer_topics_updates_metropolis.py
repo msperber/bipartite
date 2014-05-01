@@ -86,25 +86,26 @@ def proposeAndAcceptOrReject(topic, isNewTopic, isDeletingTopic, wordType, textC
         newActiveTopics = list(originalActiveTopics)
         newActiveTopics.remove(topic)
     samplingVariables.activateRevertableChanges(False)
-    logProbZGivenWGamma = computeLogProbZGivenWGamma(wordType=wordType, 
-                                                     kiPlus=0,
-                                                     zMat=samplingVariables.zMat, 
-                                                     activeTopics=originalActiveTopics, 
-                                                     gammas=samplingVariables.gammas, 
-                                                     wArr=samplingVariables.wArr, 
-                                                     alpha=hyperParameters.alpha, 
-                                                     sigma=hyperParameters.sigma, 
-                                                     tau=hyperParameters.tau)
+    logProbWUGamma = computeLogProbWUGamma(wordType=wordType,
+                                                textCorpus=textCorpus, 
+                                                hyperParameters=hyperParameters,
+                                                gammas=samplingVariables.gammas, 
+                                                uMat=samplingVariables.uMat, 
+                                                activeTopics=originalActiveTopics, 
+                                                wArr=samplingVariables.wArr, 
+                 numActiveTopicsForWordType=samplingVariables.counts.numActiveTopicsForWordType,
+                 numWordTypesActivatedInTopic=samplingVariables.counts.numActiveTopicsForWordType)
+    
     samplingVariables.activateRevertableChanges()
-    logProbZTildeGivenWGamma = computeLogProbZGivenWGamma(wordType=wordType, 
-                                                     kiPlus=kiPlus,
-                                                     zMat=samplingVariables.zMat, 
-                                                     activeTopics=originalActiveTopics, 
-                                                     gammas=samplingVariables.gammas, 
-                                                     wArr=samplingVariables.wArr, 
-                                                     alpha=hyperParameters.alpha, 
-                                                     sigma=hyperParameters.sigma, 
-                                                     tau=hyperParameters.tau)
+    logProbWUGammaTilde = computeLogProbWUGamma(wordType=wordType, 
+                                                textCorpus=textCorpus, 
+                                                uMat=samplingVariables.uMat, 
+                                                activeTopics=originalActiveTopics, 
+                                                gammas=samplingVariables.gammas, 
+                                                wArr=samplingVariables.wArr, 
+                                                hyperParameters=hyperParameters,
+                 numActiveTopicsForWordType=samplingVariables.counts.numActiveTopicsForWordType,
+                 numWordTypesActivatedInTopic=samplingVariables.counts.numActiveTopicsForWordType)
     
     # draw new topic assignment proposal: re-draw all occurrences of wordType
     LQi = samplingVariables.counts.docWordPosListForWordTypes[wordType]
@@ -162,10 +163,10 @@ def proposeAndAcceptOrReject(topic, isNewTopic, isDeletingTopic, wordType, textC
    
     
     # compute probs of drawing topics t and t~
-    ratio = math.exp(  logProbZTildeGivenWGamma   - logProbZGivenWGamma \
-                     + logProbWoTTildeGivenZTilde - logProbWoTGivenZ \
-                     + logQiUTildeToU              - logQiUToUTilde\
-                     + logProbRevertingTopics     - logProbDrawingNewTopics)
+    ratio = math.exp(  logProbWUGammaTilde          - logProbWUGamma \
+                     + logProbWoTTildeGivenZTilde   - logProbWoTGivenZ \
+                     + logQiUTildeToU               - logQiUToUTilde\
+                     + logProbRevertingTopics       - logProbDrawingNewTopics)
     if ratio >= 1 or flipCoin(ratio):
         print "accepted"
         samplingVariables.makePermanent()
@@ -398,21 +399,40 @@ def computeLogProbOfDrawingTopics(LQi, drawnTopics, activeTopics, tLArr, zMat, c
         jointLogProb += logProb
     return jointLogProb
 
-
-def computeLogProbZGivenWGamma(wordType, kiPlus, zMat, activeTopics, gammas, wArr, alpha,sigma,tau):
-    logProbZGivenWGamma = 0.0
+def computeLogProbWUGamma(wordType, textCorpus, hyperParameters, gammas, wArr, uMat,  activeTopics,
+                          numActiveTopicsForWordType, numWordTypesActivatedInTopic):
+    logProbWUGamma = 0.0
+    for iteratingWordType in range(textCorpus.getVocabSize):
+        logProbWUGamma += numActiveTopicsForWordType[wordType]\
+                            * math.log(gammas[iteratingWordType])
     for iteratingTopic in activeTopics:
-        logProbZGivenWGamma += (1.0 - zMat[wordType, iteratingTopic]) \
-                                * (-gammas[wordType] * wArr[iteratingTopic])
-        logProbZGivenWGamma += zMat[wordType, iteratingTopic] \
-                            * math.log(1.0 - math.exp(-gammas[wordType] * wArr[iteratingTopic]))
-        logProbZGivenWGamma += logPoissonPsiFunc(kiPlus=kiPlus, 
-                                                 wordType=wordType, 
-                                                 gammas=gammas, 
-                                                 alpha=alpha, 
-                                                 sigma=sigma, 
-                                                 tau=tau)
-    return logProbZGivenWGamma
+        logProbWUGamma += numWordTypesActivatedInTopic[iteratingTopic]\
+                            * math.log(wArr[iteratingTopic])
+        logProbWUGamma += expr.lambdaFunction(wArr[iteratingTopic], 
+                                              hyperParameters.alpha, 
+                                              hyperParameters.sigma, 
+                                              hyperParameters.tau)       
+        for iteratingWordType in range(textCorpus.getVocabSize):
+            logProbWUGamma -= wArr[iteratingTopic]\
+                                * gammas[iteratingWordType]\
+                                * uMat[iteratingWordType,iteratingTopic]
+    return logProbWUGamma
+
+            
+#def computeLogProbZGivenWGamma(wordType, kiPlus, zMat, activeTopics, gammas, wArr, alpha,sigma,tau):
+#    logProbZGivenWGamma = 0.0
+#    for iteratingTopic in activeTopics:
+#        logProbZGivenWGamma += (1.0 - zMat[wordType, iteratingTopic]) \
+#                                * (-gammas[wordType] * wArr[iteratingTopic])
+#        logProbZGivenWGamma += zMat[wordType, iteratingTopic] \
+#                            * math.log(1.0 - math.exp(-gammas[wordType] * wArr[iteratingTopic]))
+#        logProbZGivenWGamma += logPoissonPsiFunc(kiPlus=kiPlus, 
+#                                                 wordType=wordType, 
+#                                                 gammas=gammas, 
+#                                                 alpha=alpha, 
+#                                                 sigma=sigma, 
+#                                                 tau=tau)
+#    return logProbZGivenWGamma
     
 def logPoissonPsiFunc(kiPlus, wordType, gammas, alpha, sigma, tau):
         lamPoisson = expr.psiTildeFunction(t=gammas[wordType], 
