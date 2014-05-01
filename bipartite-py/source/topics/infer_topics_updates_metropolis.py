@@ -240,6 +240,7 @@ def proposeAddAndAcceptOrReject(wordType, textCorpus, hyperParameters, samplingV
     newU = 0 # TODO: draw new u
     samplingVariables.revertableChangeInZ(wordType, addedTopic, oldZ=0, newZ=1)
     samplingVariables.revertableChangeInU(wordType, addedTopic, oldU=1, newU=newU)
+    samplingVariables.activateRevertableChanges(False)
     
     # compute probs of moving from Z to ZTilde and vice versa
     K = len(samplingVariables.getActiveTopics())
@@ -255,6 +256,7 @@ def proposeAddAndAcceptOrReject(wordType, textCorpus, hyperParameters, samplingV
                              *math.exp(-curW*gammaUSum))
     logQiUTildeToU = math.log(proposalTypeProportions[PROPOSE_DELETE] / (Ki + 1))
 
+    samplingVariables.activateRevertableChanges(True)
     proposeAndAcceptOrReject(topic=addedTopic, 
                              isNewTopic=False, 
                              isDeletingTopic=False,
@@ -284,6 +286,7 @@ def proposeDeleteAndAcceptOrReject(wordType, textCorpus, hyperParameters, sampli
     oldU = samplingVariables.uMat[wordType,deletedTopic]
     samplingVariables.revertableChangeInZ(wordType, deletedTopic, oldZ=1, newZ=0)
     samplingVariables.revertableChangeInU(wordType, deletedTopic, oldU=oldU, newU=1)
+    samplingVariables.activateRevertableChanges(False)
 
     K = len(samplingVariables.getActiveTopics())
     Ki = numActiveTopicsForWordType[wordType]
@@ -305,6 +308,8 @@ def proposeDeleteAndAcceptOrReject(wordType, textCorpus, hyperParameters, sampli
                                                   hyperParameters.sigma, hyperParameters.tau)\
                                  *(curW**samplingVariables.counts.numWordTypesActivatedInTopic[deletedTopic])\
                                  *math.exp(-curW*gammaUSum))
+
+    samplingVariables.activateRevertableChanges(True)
     proposeAndAcceptOrReject(topic=deletedTopic, 
                              isNewTopic=False, 
                              isDeletingTopic=True,
