@@ -110,7 +110,7 @@ class GibbsSamplingVariables(RevertableParent):
             self.uMat[self.revertableUChange[0], self.revertableUChange[1]] = self.revertableUChange[2]
             self.revertableUChange = None
         if self.revertableWChange is not None:
-            self.wArr[self.revertableWChange[0]] = self.revertableUChange[1]
+            self.wArr[self.revertableWChange[0]] = self.revertableWChange[1]
             self.revertableWChange = None
         for obj in self.getRevertableObjects():
             obj.revert()
@@ -122,7 +122,7 @@ class GibbsSamplingVariables(RevertableParent):
             self.uMat[self.revertableUChange[0], self.revertableUChange[1]] = self.revertableUChange[3]
             self.revertableUChange = None
         if self.revertableWChange is not None:
-            self.wArr[self.revertableWChange[0]] = self.revertableUChange[2]
+            self.wArr[self.revertableWChange[0]] = self.revertableWChange[2]
             self.revertableWChange = None
         for obj in self.getRevertableObjects():
             obj.makePermanent()

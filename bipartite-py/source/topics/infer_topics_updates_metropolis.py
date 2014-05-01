@@ -409,7 +409,7 @@ def computeLogProbOfDrawingTopics(LQi, drawnTopics, activeTopics, tLArr, zMat, c
 def computeLogProbWUGamma(wordType, textCorpus, hyperParameters, gammas, wArr, uMat,  activeTopics,
                           numActiveTopicsForWordType, numWordTypesActivatedInTopic):
     logProbWUGamma = 0.0
-    for iteratingWordType in range(textCorpus.getVocabSize):
+    for iteratingWordType in range(textCorpus.getVocabSize()):
         logProbWUGamma += numActiveTopicsForWordType[wordType]\
                             * math.log(gammas[iteratingWordType])
     for iteratingTopic in activeTopics:
@@ -419,7 +419,7 @@ def computeLogProbWUGamma(wordType, textCorpus, hyperParameters, gammas, wArr, u
                                               hyperParameters.alpha, 
                                               hyperParameters.sigma, 
                                               hyperParameters.tau)       
-        for iteratingWordType in range(textCorpus.getVocabSize):
+        for iteratingWordType in range(textCorpus.getVocabSize()):
             logProbWUGamma -= wArr[iteratingTopic]\
                                 * gammas[iteratingWordType]\
                                 * uMat[iteratingWordType,iteratingTopic]
