@@ -74,7 +74,7 @@ def updateZs(textCorpus, samplingVariables, hyperParameters, limitUpdatesToWordT
 def proposeAndAcceptOrReject(topic, isNewTopic, isDeletingTopic, wordType, textCorpus, 
                              hyperParameters, samplingVariablesWithRevertableChanges,
                              proposalTypeProportions, numActiveTopicsForWordType,
-                             numWordTypesActivatedInTopic, logQZToZTilde, logQZTildeToZ):
+                             numWordTypesActivatedInTopic, logQiUToUTilde, logQiUTildeToU):
     samplingVariables = samplingVariablesWithRevertableChanges
     originalActiveTopics = samplingVariables.getActiveTopics()
     newActiveTopics = originalActiveTopics
@@ -164,7 +164,7 @@ def proposeAndAcceptOrReject(topic, isNewTopic, isDeletingTopic, wordType, textC
     # compute probs of drawing topics t and t~
     ratio = math.exp(  logProbZTildeGivenWGamma   - logProbZGivenWGamma \
                      + logProbWoTTildeGivenZTilde - logProbWoTGivenZ \
-                     + logQZTildeToZ              - logQZToZTilde\
+                     + logQiUTildeToU              - logQiUToUTilde\
                      + logProbRevertingTopics     - logProbDrawingNewTopics)
     if ratio >= 1 or flipCoin(ratio):
         print "accepted"
@@ -197,19 +197,23 @@ def proposeCreateAndAcceptOrReject(wordType, textCorpus, hyperParameters, sampli
 
     newU = 0 # TODO: draw new u
     oldU = 1 # any value will do
-    gammaSum = sum([samplingVariables.gammas[i] \
+    gammaUSum = sum([samplingVariables.gammas[i] \
                for i in range(textCorpus.getVocabSize()) if i!=wordType])
-    gammaSum += samplingVariables.gammas[wordType] * newU 
+    gammaUSum += samplingVariables.gammas[wordType] * newU 
     newW = np.random.gamma(1 - hyperParameters.sigma,
-                           1.0/(hyperParameters.tau+gammaSum)) 
+                           1.0/(hyperParameters.tau+gammaUSum)) 
     
     samplingVariables.revertableChangeInZ(wordType, newTopic, oldZ=0, newZ=1)
     samplingVariables.revertableChangeInU(wordType, newTopic, oldU=oldU, newU=newU)
     samplingVariables.revertableChangeInW(newTopic, oldW=1, newW=newW)
 
     # compute probs of moving from Z to ZTilde and vice versa
-    logQZToZTilde = math.log(proposalTypeProportions[PROPOSE_CREATE])
-    logQZTildeToZ = math.log(proposalTypeProportions[PROPOSE_DELETE] \
+    logQiUToUTilde = math.log(proposalTypeProportions[PROPOSE_CREATE]\
+                             *expr.lambdaFunction(newW, hyperParameters.alpha, 
+                                                  hyperParameters.sigma, hyperParameters.tau)\
+                             *newW\
+                             *math.exp(-newW*gammaUSum))
+    logQiUTildeToU = math.log(proposalTypeProportions[PROPOSE_DELETE] \
                              * 1.0/(1.0+numActiveTopicsForWordType[wordType]))
 
     proposeAndAcceptOrReject(topic=newTopic, 
@@ -223,8 +227,8 @@ def proposeCreateAndAcceptOrReject(wordType, textCorpus, hyperParameters, sampli
                              numActiveTopicsForWordType=numActiveTopicsForWordType,
                              numWordTypesActivatedInTopic=\
                                             samplingVariables.counts.numWordTypesActivatedInTopic,
-                             logQZToZTilde=logQZToZTilde, 
-                             logQZTildeToZ=logQZTildeToZ)
+                             logQiUToUTilde=logQiUToUTilde, 
+                             logQiUTildeToU=logQiUTildeToU)
 
         
 def proposeAddAndAcceptOrReject(wordType, textCorpus, hyperParameters, samplingVariables,
@@ -240,8 +244,16 @@ def proposeAddAndAcceptOrReject(wordType, textCorpus, hyperParameters, samplingV
     # compute probs of moving from Z to ZTilde and vice versa
     K = len(samplingVariables.getActiveTopics())
     Ki = numActiveTopicsForWordType[wordType]
-    logQZToZTilde = math.log(proposalTypeProportions[PROPOSE_ADD] / (K - Ki))
-    logQZTildeToZ = math.log(proposalTypeProportions[PROPOSE_DELETE] / (Ki + 1))
+    curW = samplingVariables.wArr[addedTopic]
+    gammaUSum = sum([samplingVariables.gammas[i]*samplingVariables.uMat[i,addedTopic] \
+               for i in range(textCorpus.getVocabSize()) if i!=wordType])
+    gammaUSum += samplingVariables.gammas[wordType]*newU
+    logQiUToUTilde = math.log(proposalTypeProportions[PROPOSE_ADD] / (K - Ki)\
+                              *expr.lambdaFunction(curW, hyperParameters.alpha, 
+                                                  hyperParameters.sigma, hyperParameters.tau)\
+                             *(curW**samplingVariables.counts.numWordTypesActivatedInTopic[addedTopic]+1)\
+                             *math.exp(-curW*gammaUSum))
+    logQiUTildeToU = math.log(proposalTypeProportions[PROPOSE_DELETE] / (Ki + 1))
 
     proposeAndAcceptOrReject(topic=addedTopic, 
                              isNewTopic=False, 
@@ -254,8 +266,8 @@ def proposeAddAndAcceptOrReject(wordType, textCorpus, hyperParameters, samplingV
                              numActiveTopicsForWordType=numActiveTopicsForWordType,
                              numWordTypesActivatedInTopic=\
                                             samplingVariables.counts.numWordTypesActivatedInTopic,
-                             logQZToZTilde=logQZToZTilde, 
-                             logQZTildeToZ=logQZTildeToZ)
+                             logQiUToUTilde=logQiUToUTilde, 
+                             logQiUTildeToU=logQiUTildeToU)
 
 def proposeDeleteAndAcceptOrReject(wordType, textCorpus, hyperParameters, samplingVariables,
                                    proposalTypeProportions, numActiveTopicsForWordType,
@@ -275,13 +287,24 @@ def proposeDeleteAndAcceptOrReject(wordType, textCorpus, hyperParameters, sampli
 
     K = len(samplingVariables.getActiveTopics())
     Ki = numActiveTopicsForWordType[wordType]
-    logQZToZTilde = math.log(proposalTypeProportions[PROPOSE_DELETE] / K)
+    logQiUToUTilde = math.log(proposalTypeProportions[PROPOSE_DELETE] / K)
     samplingVariables.activateRevertableChanges()
     reversalProposalTypeProportions = drawProposalTypeProportions(wordType, samplingVariables.zMat, samplingVariables.getActiveTopics())
-    if numWordTypesActivatedInTopic[wordType] == 1:
-        logQZTildeToZ = math.log(reversalProposalTypeProportions[PROPOSE_CREATE])
+    curW = samplingVariables.wArr[deletedTopic]
+    gammaUSum = sum([samplingVariables.gammas[i]*samplingVariables.uMat[i,deletedTopic] \
+               for i in range(textCorpus.getVocabSize())])
+    if numWordTypesActivatedInTopic[wordType] == 1: # if topic gets killed:
+        logQiUTildeToU = math.log(reversalProposalTypeProportions[PROPOSE_CREATE]\
+                                 *expr.lambdaFunction(curW, hyperParameters.alpha, 
+                                                  hyperParameters.sigma, hyperParameters.tau)\
+                                 *(curW**samplingVariables.counts.numWordTypesActivatedInTopic[deletedTopic])\
+                                 *math.exp(-curW*gammaUSum))
     else: 
-        logQZTildeToZ = math.log(reversalProposalTypeProportions[PROPOSE_ADD] / (K - Ki + 1))
+        logQiUTildeToU = math.log(reversalProposalTypeProportions[PROPOSE_ADD] / (K - Ki + 1)\
+                                 *expr.lambdaFunction(curW, hyperParameters.alpha, 
+                                                  hyperParameters.sigma, hyperParameters.tau)\
+                                 *(curW**samplingVariables.counts.numWordTypesActivatedInTopic[deletedTopic])\
+                                 *math.exp(-curW*gammaUSum))
     proposeAndAcceptOrReject(topic=deletedTopic, 
                              isNewTopic=False, 
                              isDeletingTopic=True,
@@ -293,8 +316,8 @@ def proposeDeleteAndAcceptOrReject(wordType, textCorpus, hyperParameters, sampli
                              numActiveTopicsForWordType=numActiveTopicsForWordType,
                              numWordTypesActivatedInTopic=\
                                             samplingVariables.counts.numWordTypesActivatedInTopic,
-                             logQZToZTilde=logQZToZTilde, 
-                             logQZTildeToZ=logQZTildeToZ)
+                             logQiUToUTilde=logQiUToUTilde, 
+                             logQiUTildeToU=logQiUTildeToU)
     # remove dead topics
     samplingVariables.releaseDeadTopics()
 
