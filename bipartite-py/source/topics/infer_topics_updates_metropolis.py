@@ -421,10 +421,10 @@ def computeLogProbWUGamma(kiPlus, wordType, textCorpus, hyperParameters, gammas,
     for iteratingTopic in activeTopics:
         logProbWUGamma += numWordTypesActivatedInTopic[iteratingTopic]\
                             * math.log(wArr[iteratingTopic])
-        logProbWUGamma += expr.lambdaFunction(wArr[iteratingTopic], 
+        logProbWUGamma += math.log(expr.lambdaFunction(wArr[iteratingTopic], 
                                               hyperParameters.alpha, 
                                               hyperParameters.sigma, 
-                                              hyperParameters.tau)       
+                                              hyperParameters.tau) )      
         for iteratingWordType in range(textCorpus.getVocabSize()):
             logProbWUGamma -= wArr[iteratingTopic]\
                                 * gammas[iteratingWordType]\
