@@ -252,6 +252,19 @@ class RevertableSparseDict(dict):
         return self.defaultReturnValue
     def activateRevertableChanges(self, value=True):
         self.activateRevertable=value
+    def __str__(self):
+        strDict = dict(self)
+        if self.activateRevertable:
+            for key in self.tmpDict:
+                strDict[key] = self.tmpDict[key]
+        return strDict.__str__()
+    def __repr__(self):
+        strDict = dict(self)
+        if self.activateRevertable:
+            for key in self.tmpDict:
+                strDict[key] = self.tmpDict[key]
+        return strDict.__repr__()
+            
         
 class RevertableListList(list):
     def revert(self):
