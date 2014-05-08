@@ -245,11 +245,13 @@ class RevertableSparseDict(dict):
             self.__setitem__(k, self.tmpDict[k])
         self.tmpDict.clear()
     def __getitem__(self, key):
+        return self.get(key, self.defaultReturnValue)
+    def get(self, key, default=None):
         if self.activateRevertable and len(self.tmpDict)>0 and key in self.tmpDict:
             return self.tmpDict[key]
         elif key in super(RevertableSparseDict, self).keys():
             return super(RevertableSparseDict, self).__getitem__(key)
-        return self.defaultReturnValue
+        return default
     def activateRevertableChanges(self, value=True):
         self.activateRevertable=value
     def __str__(self):
@@ -306,6 +308,18 @@ class RevertableList(list):
             return super(RevertableList, self).__getitem__(index)
     def activateRevertableChanges(self, value=True):
         self.activateRevertable=value
+    def __str__(self):
+        strLst = list(self)
+        if self.activateRevertable:
+            for k in self.tmpDict:
+                strLst[k] = self.tmpDict[k]
+        return strLst.__str__()
+    def __repr__(self):
+        strLst = list(self)
+        if self.activateRevertable:
+            for k in self.tmpDict:
+                strLst[k] = self.tmpDict[k]
+        return strLst.__repr__()
     
 class GibbsCounts(RevertableParent):
     """

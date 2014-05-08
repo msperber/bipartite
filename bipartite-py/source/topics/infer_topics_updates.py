@@ -136,7 +136,11 @@ def probDistributionTGivenZT(activeTopics, doc, wordPos, alphaTheta, alphaF, tex
             unnormalizedTopicProbs2.append(0.0)
         else:
             numTopicAssignmentsToDocCount = numTopicOccurencesInDoc.get((doc, iteratingTopic), 0)
-            if iteratingTopic==topicOfCurrentWord: numTopicAssignmentsToDocCount -= 1
+            for docPos, wordPos in excludeDocWordPositions:
+                if docPos==doc and tLArr[docPos][wordPos]==iteratingTopic:
+                    numTopicAssignmentsToDocCount -= 1
+            print "numTopicAssignmentsToDocCount:", numTopicAssignmentsToDocCount
+#            if iteratingTopic==topicOfCurrentWord: numTopicAssignmentsToDocCount -= 1
             numTopicAssignmentsToWordTypeCount = GibbsCounts.getNumTopicAssignmentsToWordTypeExcl(\
                                         wordType=wordType, topic=iteratingTopic, tLArr=tLArr,
                                         textCorpus=textCorpus, 
@@ -173,7 +177,7 @@ def sampleTGivenZT(activeTopics, doc, wordPos, alphaTheta, alphaF, textCorpus, t
                    numTopicOccurencesInDoc,
                    c_theta = expr.c_theta_K,
                    c_f = expr.c_f_mj,
-                   excludeDocWordPositions=[])
+                   excludeDocWordPositions=excludeDocWordPositions)
     rawTopic = np.nonzero(np.random.multinomial(1, normalizedTopicProbs))[0][0]
     topic = activeTopics[rawTopic]
     logProb = math.log(normalizedTopicProbs[rawTopic])

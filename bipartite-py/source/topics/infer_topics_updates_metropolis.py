@@ -96,7 +96,7 @@ def proposeAndAcceptOrReject(topic, isNewTopic, isDeletingTopic, wordType, textC
                                                 activeTopics=originalActiveTopics, 
                                                 wArr=samplingVariables.wArr, 
                  numActiveTopicsForWordType=samplingVariables.counts.numActiveTopicsForWordType,
-                 numWordTypesActivatedInTopic=samplingVariables.counts.numActiveTopicsForWordType)
+                 numWordTypesActivatedInTopic=samplingVariables.counts.numWordTypesActivatedInTopic)
     
     samplingVariables.activateRevertableChanges()
     logProbWUGammaTilde = computeLogProbWUGamma(kiPlus=kiPlus,
@@ -108,7 +108,7 @@ def proposeAndAcceptOrReject(topic, isNewTopic, isDeletingTopic, wordType, textC
                                                 wArr=samplingVariables.wArr, 
                                                 hyperParameters=hyperParameters,
                  numActiveTopicsForWordType=samplingVariables.counts.numActiveTopicsForWordType,
-                 numWordTypesActivatedInTopic=samplingVariables.counts.numActiveTopicsForWordType)
+                 numWordTypesActivatedInTopic=samplingVariables.counts.numWordTypesActivatedInTopic)
     
     # draw new topic assignment proposal: re-draw all occurrences of wordType
     LQi = samplingVariables.counts.docWordPosListForWordTypes[wordType]
@@ -259,20 +259,21 @@ def proposeAddAndAcceptOrReject(wordType, textCorpus, hyperParameters, samplingV
     
     # compute probs of moving from Z to ZTilde and vice versa
     K = len(samplingVariables.getActiveTopics())
-    Ki = numActiveTopicsForWordType[wordType]
+    Kinew = numActiveTopicsForWordType[wordType]
     gammaUSum = sum([samplingVariables.gammas[i]*samplingVariables.uMat[i,addedTopic] \
                for i in range(textCorpus.getVocabSize()) if i!=wordType])
     gammaUSum += samplingVariables.gammas[wordType]*newU
     print "K:", K
-    print "Ki:", Ki
+    print "Kinew:", Kinew
     samplingVariables.activateRevertableChanges()
-    logQiUToUTilde = math.log(proposalTypeProportions[PROPOSE_ADD] / (K - Ki)\
+    newMJ = samplingVariables.counts.numWordTypesActivatedInTopic[addedTopic]
+    logQiUToUTilde = math.log(proposalTypeProportions[PROPOSE_ADD] / (K - (Kinew-1))\
                               *expr.lambdaFunction(newW, hyperParameters.alpha, 
                                                   hyperParameters.sigma, hyperParameters.tau)\
-                             *(newW**samplingVariables.counts.numWordTypesActivatedInTopic[addedTopic]+1)\
+                             *(newW**newMJ)\
                              *math.exp(-newW*gammaUSum))
     reversalProposalTypeProportions = drawProposalTypeProportions(wordType, samplingVariables.zMat, samplingVariables.getActiveTopics())
-    logQiUTildeToU = math.log(reversalProposalTypeProportions[PROPOSE_DELETE] / (Ki + 1))
+    logQiUTildeToU = math.log(reversalProposalTypeProportions[PROPOSE_DELETE] / (Kinew))
 
     proposeAndAcceptOrReject(topic=addedTopic, 
                              isNewTopic=False, 
@@ -378,7 +379,7 @@ def drawRevertableTopicProposalsAndUpdateCounts(LQi, activeTopics, tLArr, zMat, 
                     textCorpus=textCorpus,
                     tLArr=tLArr,
                     zMat=zMat,
-                    excludeDocWordPositions=LQi[r+1:],
+                    excludeDocWordPositions=LQi[r:],
                     numWordTypesActivatedInTopics=counts.numWordTypesActivatedInTopic,
                     numTopicOccurencesInDoc=counts.numTopicOccurencesInDoc,
                     numTopicAssignmentsToWordType=counts.numTopicAssignmentsToWordType)
