@@ -129,7 +129,7 @@ def probDistributionTGivenZT(activeTopics, doc, wordPos, alphaTheta, alphaF, tex
                    excludeDocWordPositions=[]):
     unnormalizedTopicProbs1, unnormalizedTopicProbs2 = [], []
     wordType = textCorpus[doc][wordPos]
-    topicOfCurrentWord = tLArr[doc][wordPos]
+#    topicOfCurrentWord = tLArr[doc][wordPos]
     for iteratingTopic in activeTopics:
         if zMat[wordType,iteratingTopic] <= 1e-6:
             unnormalizedTopicProbs1.append(0.0)
@@ -139,7 +139,6 @@ def probDistributionTGivenZT(activeTopics, doc, wordPos, alphaTheta, alphaF, tex
             for docPos, wordPos in excludeDocWordPositions:
                 if docPos==doc and tLArr[docPos][wordPos]==iteratingTopic:
                     numTopicAssignmentsToDocCount -= 1
-            print "numTopicAssignmentsToDocCount:", numTopicAssignmentsToDocCount
 #            if iteratingTopic==topicOfCurrentWord: numTopicAssignmentsToDocCount -= 1
             numTopicAssignmentsToWordTypeCount = GibbsCounts.getNumTopicAssignmentsToWordTypeExcl(\
                                         wordType=wordType, topic=iteratingTopic, tLArr=tLArr,

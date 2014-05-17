@@ -115,7 +115,7 @@ def proposeAndAcceptOrReject(topic, isNewTopic, isDeletingTopic, wordType, textC
     oldTopics = [samplingVariables.tLArr[docPos][wordPos] for (docPos,wordPos) in LQi]
     samplingVariables.activateRevertableChanges()
     logProbDrawingNewTopics = drawRevertableTopicProposalsAndUpdateCounts(LQi=LQi, 
-                                                activeTopics=samplingVariables.getActiveTopics(),
+                                                activeTopics=newActiveTopics,
                                                 tLArr=samplingVariables.tLArr, 
                                                 zMat=samplingVariables.zMat, 
                                                 counts=samplingVariables.counts, 
@@ -125,7 +125,7 @@ def proposeAndAcceptOrReject(topic, isNewTopic, isDeletingTopic, wordType, textC
     samplingVariables.activateRevertableChanges(False)
     logProbRevertingTopics = computeLogProbOfDrawingTopics(LQi=LQi, 
                                                 drawnTopics=oldTopics,
-                                                activeTopics=samplingVariables.getActiveTopics(),
+                                                activeTopics=originalActiveTopics,
                                                 tLArr=samplingVariables.tLArr, 
                                                 zMat=samplingVariables.zMat, 
                                                 counts=samplingVariables.counts, 
@@ -221,7 +221,7 @@ def proposeCreateAndAcceptOrReject(wordType, textCorpus, hyperParameters, sampli
                              *newW\
                              *math.exp(-newW*gammaUSum))
     logQiUTildeToU = math.log(proposalTypeProportions[PROPOSE_DELETE] \
-                             * 1.0/(1.0+numActiveTopicsForWordType[wordType]))
+                             * 1.0/(numActiveTopicsForWordType[wordType]))
 
     proposeAndAcceptOrReject(topic=newTopic, 
                              isNewTopic=True, 
@@ -314,7 +314,7 @@ def proposeDeleteAndAcceptOrReject(wordType, textCorpus, hyperParameters, sampli
     curW = samplingVariables.wArr[deletedTopic]
     gammaUSum = sum([samplingVariables.gammas[i]*samplingVariables.uMat[i,deletedTopic] \
                for i in range(textCorpus.getVocabSize())])
-    if numWordTypesActivatedInTopic[wordType] == 1: # if topic gets killed:
+    if numWordTypesActivatedInTopic[deletedTopic] <= 1: # if topic gets killed:
         logQiUTildeToU = math.log(reversalProposalTypeProportions[PROPOSE_CREATE]\
                                  *expr.lambdaFunction(curW, hyperParameters.alpha, 
                                                   hyperParameters.sigma, hyperParameters.tau)\
@@ -409,7 +409,7 @@ def computeLogProbOfDrawingTopics(LQi, drawnTopics, activeTopics, tLArr, zMat, c
                     textCorpus=textCorpus,
                     tLArr=tLArr,
                     zMat=zMat,
-                    excludeDocWordPositions=LQi[r+1:],
+                    excludeDocWordPositions=LQi[r:],
                     numWordTypesActivatedInTopics=counts.numWordTypesActivatedInTopic,
                     numTopicOccurencesInDoc=counts.numTopicOccurencesInDoc,
                     numTopicAssignmentsToWordType=counts.numTopicAssignmentsToWordType)[activeTopics.index(drawnTopic)]
