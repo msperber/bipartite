@@ -78,7 +78,7 @@ class TestUpdateGenerated(): # unittest.TestCase):
         print "baseStatistic, updatedStatistic:", baseStatistic, updatedStatistic
         self.assert_list_almost_equal(updatedStatistic, baseStatistic, decimal=1)
 
-    def _not_testTUpdates(self):
+    def _nottestTUpdates(self):
         random.seed(13)
         np.random.seed(13)
 
